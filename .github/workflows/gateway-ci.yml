@@ -1,0 +1,36 @@
+name: NEXO Gateway CI
+
+on:
+  push:
+    branches: [nexo-gateway-prep]
+    paths:
+      - "gateway/**"
+      - ".github/workflows/gateway-ci.yml"
+  pull_request:
+    paths:
+      - "gateway/**"
+      - ".github/workflows/gateway-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: gateway/package.json
+      - name: Syntax check
+        run: node --check server.mjs
+      - name: Test gateway + mobile integration
+        run: npm test
