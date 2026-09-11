@@ -59,3 +59,6 @@ test('hub rejects tampered payload hash and executable remote action types',asyn
   let r=await post('/v1/hub/send',{credential:client.credential,envelope,signature:sign(client.privateKey,envelope)});assert.equal(r.status,400);assert.equal(r.data.error,'HUB_PAYLOAD_HASH_MISMATCH');
   r=await sendNode(client,'MASTER','EXECUTE_ACTION',{tool:'blocked'});assert.equal(r.status,400);assert.equal(r.data.error,'HUB_MESSAGE_TYPE_INVALID');
 });
+
+test('PDV ERP mobile PWA is served separately from NEXA',async()=>{const r=await fetch(`${base}/pdv-mobile/`);assert.equal(r.status,200);const html=await r.text();assert.match(html,/NEXO Mobile PDV\/ERP/);});
+test('PDV ERP mobile manifest is valid',async()=>{const r=await fetch(`${base}/pdv-mobile/manifest.webmanifest`);assert.equal(r.status,200);const m=await r.json();assert.equal(m.short_name,'NEXO PDV');assert.equal(m.display,'standalone')});
