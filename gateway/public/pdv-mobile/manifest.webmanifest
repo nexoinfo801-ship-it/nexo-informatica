@@ -1,0 +1,10 @@
+{
+  "name": "NEXO Mobile PDV/ERP",
+  "short_name": "NEXO PDV",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#020811",
+  "theme_color": "#06101d",
+  "description": "NEXO Mobile PDV/ERP — vendas e gestão offline-first no iPhone."
+}
