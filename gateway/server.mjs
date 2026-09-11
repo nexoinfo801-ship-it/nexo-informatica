@@ -20,6 +20,7 @@ const PUBLIC_API_URL = String(process.env.PUBLIC_API_URL || PUBLIC_GATEWAY_URL).
 const UPSTREAM_URL = String(process.env.NEXO_UPSTREAM_URL || '').trim();
 const PRIVATE_KEY_B64 = String(process.env.BOOTSTRAP_SIGNING_PRIVATE_KEY_PEM_B64 || '').trim();
 const PUBLIC_JWK_RAW = String(process.env.BOOTSTRAP_SIGNING_PUBLIC_JWK || '').trim();
+const MOBILE_LAB_ENABLED = String(process.env.MOBILE_LAB_ENABLED || '').toLowerCase() === 'true';
 
 function json(res,status,body,extra={}){
   const raw=JSON.stringify(body);
@@ -34,6 +35,7 @@ function json(res,status,body,extra={}){
 }
 function stable(value){if(Array.isArray(value))return value.map(stable);if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(k=>[k,stable(value[k])]));return value}
 function publicJwk(){if(!PUBLIC_JWK_RAW)return null;try{return JSON.parse(PUBLIC_JWK_RAW)}catch{return null}}
+function canonical(value){return JSON.stringify(stable(value))}
 function signPayload(payload){
   if(!PRIVATE_KEY_B64)throw new Error('BOOTSTRAP_SIGNING_KEY_NOT_CONFIGURED');
   const pem=Buffer.from(PRIVATE_KEY_B64,'base64').toString('utf8');
@@ -48,6 +50,43 @@ function bootstrapEnvelope(){
   const now=new Date(),expires=new Date(now.getTime()+86400000);
   const payload={type:'NEXO_BOOTSTRAP',format_version:1,config_version:BOOTSTRAP_VERSION,gateway_url:PUBLIC_GATEWAY_URL,support_url:PUBLIC_SUPPORT_URL,api_url:PUBLIC_API_URL,issued_at:now.toISOString(),expires_at:expires.toISOString(),minimum_tls:'1.2',transport:'HTTPS'};
   return {payload,compact:signPayload(payload),public_jwk:publicJwk(),algorithm:'ES256'};
+}
+
+const labEnrollChallenges=new Map();
+const labDevices=new Map();
+const labActionChallenges=new Map();
+
+function labOnly(res,requestId){
+  if(MOBILE_LAB_ENABLED)return true;
+  json(res,404,{ok:false,error:'NOT_FOUND',request_id:requestId});
+  return false;
+}
+function labCleanup(){
+  const now=Date.now();
+  for(const [k,v] of labEnrollChallenges) if(now>Date.parse(v.expiresAt)) labEnrollChallenges.delete(k);
+  for(const [k,v] of labActionChallenges) if(now>Date.parse(v.expiresAt)||v.status!=='PENDING') labActionChallenges.delete(k);
+}
+function verifyP256Jwk(jwk,payload,signature){
+  try{
+    if(jwk?.kty!=='EC'||jwk?.crv!=='P-256')return false;
+    const key=crypto.createPublicKey({key:jwk,format:'jwk'});
+    return crypto.verify('sha256',Buffer.from(canonical(payload),'utf8'),{key,dsaEncoding:'ieee-p1363'},Buffer.from(signature,'base64url'));
+  }catch{return false}
+}
+function createLabEnrollChallenge(){
+  labCleanup();
+  const challengeId=crypto.randomUUID(),deviceId='ios-'+crypto.randomUUID();
+  const now=new Date(),expires=new Date(now.getTime()+120000);
+  const item={schema:'NEXO_MOBILE_ENROLL_CHALLENGE_V1',challengeId,deviceId,nonce:crypto.randomBytes(24).toString('base64url'),issuedAt:now.toISOString(),expiresAt:expires.toISOString()};
+  labEnrollChallenges.set(challengeId,item);return item;
+}
+function createLabActionChallenge(deviceId,action='APPROVE'){
+  labCleanup();
+  const device=labDevices.get(deviceId);
+  if(!device||device.status!=='ACTIVE')return null;
+  const challengeId=crypto.randomUUID(),now=new Date(),expires=new Date(now.getTime()+120000);
+  const item={schema:'NEXO_MOBILE_DECISION_V1',ticketId:'NEXO-IOS-FIELD-001',challengeId,correlationId:crypto.randomUUID(),deviceId,audience:'NEXO_MASTER',action,risk:'MEDIUM',nonce:crypto.randomBytes(24).toString('base64url'),issuedAt:now.toISOString(),expiresAt:expires.toISOString(),payloadHash:crypto.createHash('sha256').update('NEXO-IOS-FIELD-001:LAB').digest('hex'),status:'PENDING'};
+  labActionChallenges.set(challengeId,item);return {...item};
 }
 
 const rate=new Map();
@@ -107,8 +146,47 @@ const server=http.createServer(async(req,res)=>{
     const url=new URL(req.url||'/','http://local');
     if(req.method==='GET'&&url.pathname==='/mobile'){res.writeHead(308,{location:'/mobile/'});return res.end()}
     if(req.method==='GET'&&url.pathname.startsWith('/mobile/')){if(await serveMobile(res,url.pathname))return}
-    if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'NEXO Gateway',version:'0.2.0-mobile',bootstrap_configured:Boolean(PRIVATE_KEY_B64&&publicJwk()),upstream_configured:Boolean(UPSTREAM_URL),mobile_path:'/mobile/',time:new Date().toISOString()});
+    if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'NEXO Gateway',version:'0.3.0-ios-lab',bootstrap_configured:Boolean(PRIVATE_KEY_B64&&publicJwk()),upstream_configured:Boolean(UPSTREAM_URL),mobile_path:'/mobile/',mobile_lab_enabled:MOBILE_LAB_ENABLED,time:new Date().toISOString()});
     if(req.method==='GET'&&(url.pathname==='/v1/bootstrap'||url.pathname==='/bootstrap'))return json(res,200,{ok:true,envelope:bootstrapEnvelope(),request_id:requestId});
+
+    if(req.method==='POST'&&url.pathname==='/v1/mobile/lab/enroll/challenge'){
+      if(!labOnly(res,requestId))return;
+      return json(res,200,{ok:true,challenge:createLabEnrollChallenge(),request_id:requestId});
+    }
+    if(req.method==='POST'&&url.pathname==='/v1/mobile/lab/enroll/complete'){
+      if(!labOnly(res,requestId))return;
+      const body=await readJson(req);
+      const ch=labEnrollChallenges.get(String(body.challengeId||''));
+      if(!ch)return json(res,400,{ok:false,error:'ENROLL_CHALLENGE_NOT_FOUND',request_id:requestId});
+      if(Date.now()>Date.parse(ch.expiresAt)){labEnrollChallenges.delete(ch.challengeId);return json(res,400,{ok:false,error:'ENROLL_CHALLENGE_EXPIRED',request_id:requestId})}
+      if(body.deviceId!==ch.deviceId||body.nonce!==ch.nonce)return json(res,400,{ok:false,error:'ENROLL_CHALLENGE_MISMATCH',request_id:requestId});
+      const payload={schema:'NEXO_MOBILE_ENROLLMENT_V1',challengeId:ch.challengeId,deviceId:ch.deviceId,nonce:ch.nonce,publicJwk:body.publicJwk};
+      if(!verifyP256Jwk(body.publicJwk,payload,String(body.signature||'')))return json(res,400,{ok:false,error:'ENROLL_SIGNATURE_INVALID',request_id:requestId});
+      labDevices.set(ch.deviceId,{deviceId:ch.deviceId,publicJwk:body.publicJwk,status:'ACTIVE',enrolledAt:new Date().toISOString()});
+      labEnrollChallenges.delete(ch.challengeId);
+      return json(res,200,{ok:true,device:{deviceId:ch.deviceId,status:'ACTIVE'},request_id:requestId});
+    }
+    if(req.method==='POST'&&url.pathname==='/v1/mobile/lab/challenge'){
+      if(!labOnly(res,requestId))return;
+      const body=await readJson(req),action=String(body.action||'APPROVE').toUpperCase();
+      if(!['APPROVE','DENY'].includes(action))return json(res,400,{ok:false,error:'BAD_ACTION',request_id:requestId});
+      const challenge=createLabActionChallenge(String(body.deviceId||''),action);
+      if(!challenge)return json(res,404,{ok:false,error:'DEVICE_NOT_ENROLLED',request_id:requestId});
+      return json(res,200,{ok:true,challenge,request_id:requestId});
+    }
+    if(req.method==='POST'&&url.pathname==='/v1/mobile/lab/decision'){
+      if(!labOnly(res,requestId))return;
+      const body=await readJson(req),challenge=labActionChallenges.get(String(body.challengeId||''));
+      if(!challenge)return json(res,400,{ok:false,error:'CHALLENGE_NOT_FOUND_OR_REPLAY',request_id:requestId});
+      if(Date.now()>Date.parse(challenge.expiresAt)){labActionChallenges.delete(challenge.challengeId);return json(res,400,{ok:false,error:'APPROVAL_EXPIRED',request_id:requestId})}
+      const device=labDevices.get(challenge.deviceId);
+      if(!device||device.status!=='ACTIVE')return json(res,400,{ok:false,error:'DEVICE_NOT_ENROLLED',request_id:requestId});
+      for(const k of ['ticketId','challengeId','correlationId','deviceId','audience','action','risk','nonce','issuedAt','expiresAt','payloadHash']) if(body[k]!==challenge[k]) return json(res,400,{ok:false,error:`CHALLENGE_MISMATCH_${k}`,request_id:requestId});
+      const payload={schema:body.schema,ticketId:body.ticketId,challengeId:body.challengeId,correlationId:body.correlationId,deviceId:body.deviceId,audience:body.audience,action:body.action,risk:body.risk,nonce:body.nonce,issuedAt:body.issuedAt,expiresAt:body.expiresAt,payloadHash:body.payloadHash};
+      if(!verifyP256Jwk(device.publicJwk,payload,String(body.signature||'')))return json(res,400,{ok:false,error:'DECISION_SIGNATURE_INVALID',request_id:requestId});
+      labActionChallenges.delete(challenge.challengeId);
+      return json(res,200,{ok:true,ack:{schema:'NEXO_MOBILE_DECISION_ACK_V1',challengeId:body.challengeId,ticketId:body.ticketId,decision:body.action,acceptedAt:new Date().toISOString()},request_id:requestId});
+    }
     const gatewayPaths=new Set(['/','/gateway','/v1/gateway','/support','/license']);
     if(req.method==='POST'&&gatewayPaths.has(url.pathname)){
       const body=await readJson(req);
@@ -125,4 +203,4 @@ const server=http.createServer(async(req,res)=>{
     return json(res,status,{ok:false,error:safe,request_id:requestId});
   }
 });
-server.listen(PORT,'0.0.0.0',()=>console.log(JSON.stringify({event:'NEXO_GATEWAY_READY',port:PORT,bootstrap_version:BOOTSTRAP_VERSION,upstream_configured:Boolean(UPSTREAM_URL),mobile_path:'/mobile/'})));
+server.listen(PORT,'0.0.0.0',()=>console.log(JSON.stringify({event:'NEXO_GATEWAY_READY',port:PORT,bootstrap_version:BOOTSTRAP_VERSION,upstream_configured:Boolean(UPSTREAM_URL),mobile_path:'/mobile/',mobile_lab_enabled:MOBILE_LAB_ENABLED})));
