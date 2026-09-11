@@ -1,0 +1,39 @@
+name: Import approved NEXA asset
+
+on:
+  push:
+    branches: [nexo-gateway-prep]
+    paths:
+      - ".github/workflows/import-nexa-asset.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: nexo-gateway-prep
+      - name: Download approved NEXA artwork
+        run: |
+          set -euo pipefail
+          mkdir -p gateway/public/mobile
+          curl --fail --location --retry 2 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/e75c308d-fc56-41c6-b987-aa4c33ce4740.png?_jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXlIYXNoIjoiMTU0ZmY4YjNiYmNjNzNkZCIsImJ1Y2tldCI6InJ1bndheS1kYXRhc2V0cyIsInN0YWdlIjoicHJvZCIsImV4cCI6MTc4OTI5Njk0N30.IVOLH4JjqurXD2qWmFoUoqlpmZHnqAY7F6qwbxjuATc' -o /tmp/nexa.png
+          file /tmp/nexa.png
+          python - <<'PY'
+          from PIL import Image
+          im=Image.open('/tmp/nexa.png').convert('RGB')
+          im.save('gateway/public/mobile/nexa-approved.webp','WEBP',quality=82,method=6)
+          print(im.size)
+          PY
+          test -s gateway/public/mobile/nexa-approved.webp
+      - name: Commit asset
+        run: |
+          git config user.name "NEXO CI"
+          git config user.email "nexo-ci@users.noreply.github.com"
+          git add gateway/public/mobile/nexa-approved.webp
+          git diff --cached --quiet && exit 0
+          git commit -m "ios ui: store approved NEXA artwork locally"
+          git push origin HEAD:nexo-gateway-prep
