@@ -1,0 +1,31 @@
+name: NEXO Client Security CI
+
+on:
+  push:
+    branches: [nexo-central-prep-v2]
+    paths:
+      - "client-security/**"
+      - "docs/NEXO_BETA_MACHINE_LOCK_V1.md"
+      - ".github/workflows/client-security-ci.yml"
+  pull_request:
+    paths:
+      - "client-security/**"
+      - "docs/NEXO_BETA_MACHINE_LOCK_V1.md"
+      - ".github/workflows/client-security-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  machine-lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax
+        run: node --check client-security/machine-lock.cjs
+      - name: Beta machine-lock regression
+        run: node --test client-security/test/machine-lock.test.cjs
