@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { URL } from 'node:url';
+import { createCommunicationHub } from './hub.mjs';
 
 const PORT = Number(process.env.PORT);
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) throw new Error('PORT_REQUIRED');
@@ -21,6 +22,7 @@ const UPSTREAM_URL = String(process.env.NEXO_UPSTREAM_URL || '').trim();
 const PRIVATE_KEY_B64 = String(process.env.BOOTSTRAP_SIGNING_PRIVATE_KEY_PEM_B64 || '').trim();
 const PUBLIC_JWK_RAW = String(process.env.BOOTSTRAP_SIGNING_PUBLIC_JWK || '').trim();
 const MOBILE_LAB_ENABLED = String(process.env.MOBILE_LAB_ENABLED || '').toLowerCase() === 'true';
+const COMPATIBILITY_ID = 'NEXO-SUITE-PRIME-R8-P5-MOBILE-20260911';
 
 function json(res,status,body,extra={}){
   const raw=JSON.stringify(body);
@@ -48,9 +50,11 @@ function validHttpsUrl(value){try{const u=new URL(value);return u.protocol==='ht
 function bootstrapEnvelope(){
   for(const value of [PUBLIC_GATEWAY_URL,PUBLIC_SUPPORT_URL,PUBLIC_API_URL]) if(!validHttpsUrl(value))throw new Error('PUBLIC_ENDPOINT_NOT_CONFIGURED');
   const now=new Date(),expires=new Date(now.getTime()+86400000);
-  const payload={type:'NEXO_BOOTSTRAP',format_version:1,config_version:BOOTSTRAP_VERSION,gateway_url:PUBLIC_GATEWAY_URL,support_url:PUBLIC_SUPPORT_URL,api_url:PUBLIC_API_URL,issued_at:now.toISOString(),expires_at:expires.toISOString(),minimum_tls:'1.2',transport:'HTTPS'};
+  const payload={type:'NEXO_BOOTSTRAP',format_version:1,config_version:BOOTSTRAP_VERSION,gateway_url:PUBLIC_GATEWAY_URL,support_url:PUBLIC_SUPPORT_URL,api_url:PUBLIC_API_URL,issued_at:now.toISOString(),expires_at:expires.toISOString(),minimum_tls:'1.2',transport:'HTTPS',communication_hub:'/v1/hub/protocol',compatibility_id:COMPATIBILITY_ID};
   return {payload,compact:signPayload(payload),public_jwk:publicJwk(),algorithm:'ES256'};
 }
+
+const communicationHub=createCommunicationHub({privateKeyB64:PRIVATE_KEY_B64,publicJwk:publicJwk(),compatibilityId:COMPATIBILITY_ID});
 
 const labEnrollChallenges=new Map();
 const labDevices=new Map();
@@ -146,8 +150,15 @@ const server=http.createServer(async(req,res)=>{
     const url=new URL(req.url||'/','http://local');
     if(req.method==='GET'&&url.pathname==='/mobile'){res.writeHead(308,{location:'/mobile/'});return res.end()}
     if(req.method==='GET'&&url.pathname.startsWith('/mobile/')){if(await serveMobile(res,url.pathname))return}
-    if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'NEXO Gateway',version:'0.3.0-ios-lab',bootstrap_configured:Boolean(PRIVATE_KEY_B64&&publicJwk()),upstream_configured:Boolean(UPSTREAM_URL),mobile_path:'/mobile/',mobile_lab_enabled:MOBILE_LAB_ENABLED,time:new Date().toISOString()});
+    if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'NEXO Gateway',version:'0.4.0-hub-lab',bootstrap_configured:Boolean(PRIVATE_KEY_B64&&publicJwk()),upstream_configured:Boolean(UPSTREAM_URL),communication_hub_configured:communicationHub.configured(),communication_hub:'/v1/hub/protocol',compatibility_id:COMPATIBILITY_ID,mobile_path:'/mobile/',mobile_lab_enabled:MOBILE_LAB_ENABLED,time:new Date().toISOString()});
     if(req.method==='GET'&&(url.pathname==='/v1/bootstrap'||url.pathname==='/bootstrap'))return json(res,200,{ok:true,envelope:bootstrapEnvelope(),request_id:requestId});
+    if(req.method==='GET'&&url.pathname==='/v1/hub/protocol')return json(res,200,{ok:true,protocol:communicationHub.protocol(),request_id:requestId});
+    if(req.method==='GET'&&url.pathname==='/v1/hub/status')return json(res,200,{ok:true,hub:communicationHub.status(),request_id:requestId});
+    if(req.method==='POST'&&url.pathname==='/v1/hub/enroll/challenge')return json(res,200,{ok:true,challenge:communicationHub.challenge(await readJson(req)),request_id:requestId});
+    if(req.method==='POST'&&url.pathname==='/v1/hub/enroll/complete')return json(res,200,{ok:true,...communicationHub.complete(await readJson(req)),request_id:requestId});
+    if(req.method==='POST'&&url.pathname==='/v1/hub/send')return json(res,200,{ok:true,...communicationHub.send(await readJson(req)),request_id:requestId});
+    if(req.method==='POST'&&url.pathname==='/v1/hub/poll')return json(res,200,{ok:true,...communicationHub.poll(await readJson(req)),request_id:requestId});
+    if(req.method==='POST'&&url.pathname==='/v1/hub/ack')return json(res,200,{ok:true,...communicationHub.ack(await readJson(req)),request_id:requestId});
 
     if(req.method==='POST'&&url.pathname==='/v1/mobile/lab/enroll/challenge'){
       if(!labOnly(res,requestId))return;
@@ -199,8 +210,9 @@ const server=http.createServer(async(req,res)=>{
     return json(res,404,{ok:false,error:'NOT_FOUND',request_id:requestId});
   }catch(error){
     const status=Number(error?.status||500);
-    const safe=['BODY_TOO_LARGE','INVALID_JSON','BOOTSTRAP_SIGNING_KEY_NOT_CONFIGURED','BOOTSTRAP_SIGNATURE_INVALID','PUBLIC_ENDPOINT_NOT_CONFIGURED'].includes(error?.message)?error.message:'INTERNAL_ERROR';
+    const msg=String(error?.message||'');
+    const safe=(['BODY_TOO_LARGE','INVALID_JSON','BOOTSTRAP_SIGNING_KEY_NOT_CONFIGURED','BOOTSTRAP_SIGNATURE_INVALID','PUBLIC_ENDPOINT_NOT_CONFIGURED'].includes(msg)||/^HUB_[A-Z0-9_]+$/.test(msg))?msg:'INTERNAL_ERROR';
     return json(res,status,{ok:false,error:safe,request_id:requestId});
   }
 });
-server.listen(PORT,'0.0.0.0',()=>console.log(JSON.stringify({event:'NEXO_GATEWAY_READY',port:PORT,bootstrap_version:BOOTSTRAP_VERSION,upstream_configured:Boolean(UPSTREAM_URL),mobile_path:'/mobile/',mobile_lab_enabled:MOBILE_LAB_ENABLED})));
+server.listen(PORT,'0.0.0.0',()=>console.log(JSON.stringify({event:'NEXO_GATEWAY_READY',port:PORT,version:'0.4.0-hub-lab',bootstrap_version:BOOTSTRAP_VERSION,upstream_configured:Boolean(UPSTREAM_URL),communication_hub_configured:communicationHub.configured(),compatibility_id:COMPATIBILITY_ID,mobile_path:'/mobile/',mobile_lab_enabled:MOBILE_LAB_ENABLED})));
