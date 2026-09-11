@@ -34,6 +34,18 @@ test('request id cannot be reused for a different action', async()=>{
   await central(body('support_status'),rid);
   await assert.rejects(()=>central(body('license_ack',{state:'active'}),rid),/REQUEST_ID_REUSED/);
 });
+test('cached request id never bypasses license authentication', async()=>{
+  const {central}=setup(); const rid=crypto.randomUUID();
+  await central(body('support_status'),rid);
+  await assert.rejects(()=>central({...body('support_status'),license_key:'INVALID.INVALID.INVALID'},rid),/AUTH_INVALID_LICENSE_OR_INSTALLATION/);
+});
+test('cached request id is scoped to the authenticated installation', async()=>{
+  const {central,store}=setup(); const rid=crypto.randomUUID();
+  await central(body('support_status'),rid);
+  store.seedLicense({licenseKey:'NEXO.TEST.SIGNED.LICENSE.KEY.002',installId:'inst-99999999',serial:'NX-SERIAL-002'});
+  const other=buildCentral({store});
+  await assert.rejects(()=>other({action:'support_status',product:'NEXO_ERP_PRO',install_id:'inst-99999999',license_key:'NEXO.TEST.SIGNED.LICENSE.KEY.002'},rid),/REQUEST_ID_REUSED/);
+});
 test('diagnostic secrets and personal document keys are redacted server-side', async()=>{
   const {central,store}=setup();
   await central(body('support_create',{ticket:{category:'Sistema',priority:'Normal',subject:'Sanitização',description:'Teste'},diagnostic:{token:'SECRET-TOKEN',cpf:'52998224725',nested:{senha:'Senha#123',ok:'safe'}}}),crypto.randomUUID());
