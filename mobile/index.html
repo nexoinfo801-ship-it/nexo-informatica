@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#03101e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="NEXA">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./app.css">
+  <title>NEXA Mobile</title>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">NEXO</div>
+      <div class="brand-sep"></div>
+      <div><strong>NEXA Mobile</strong><span>Seu suporte inteligente onde você estiver.</span></div>
+    </div>
+    <div class="top-actions">
+      <div class="online-pill" id="onlinePill"><i></i><span><b id="onlineText">ONLINE</b><small>Conectado ao NEXO</small></span></div>
+      <button class="profile" aria-label="Perfil"><span>EV</span><div><b>Everton</b><small>MASTER</small></div></button>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Navegação principal">
+    <button class="tab active" data-view="inicio">⌂<span>Início</span></button>
+    <button class="tab" data-view="chamados">▤<span>Chamados</span><em>2</em></button>
+    <button class="tab" data-view="conversa">◯<span>Conversa</span></button>
+    <button class="tab" data-view="aprovacoes">✓<span>Aprovações</span><em>2</em></button>
+    <button class="tab" data-view="relatorios">▥<span>Relatórios</span></button>
+    <button class="tab" data-view="perfil">◎<span>Perfil</span></button>
+  </nav>
+
+  <main id="viewInicio">
+    <section class="hero">
+      <div class="hero-glow"></div>
+      <div class="assistant-orb" aria-hidden="true"><span>N</span></div>
+      <div class="hero-copy">
+        <p class="eyebrow">NEXA • ASSISTENTE INTELIGENTE</p>
+        <h1>Olá, Everton!</h1>
+        <h2>Eu sou a <b>NEXA</b>, sua assistente de suporte inteligente.</h2>
+        <blockquote>“Diagnóstico, orientação e soluções, sempre ao seu lado.”</blockquote>
+        <div class="hero-benefits"><span>ϟ Mais rápido</span><span>♢ Mais seguro</span><span>▥ Mais produtivo</span></div>
+      </div>
+      <div class="device-card">
+        <small>Sistema Operacional</small>
+        <strong> iOS</strong>
+        <div><i class="ok"></i><span><b>PWA Ativo</b><small>Modo Standalone</small></span></div>
+        <div><i class="ok"></i><span><b id="deviceConnection">Online</b><small id="latencyText">Gateway aguardando</small></span></div>
+      </div>
+    </section>
+
+    <section class="quick-grid">
+      <button data-action="diagnostico"><i>⌕</i><b>Diagnóstico</b><span>Verifique o sistema</span></button>
+      <button data-action="conversa"><i>◌</i><b>Falar com a NEXA</b><span>Tire suas dúvidas</span></button>
+      <button data-action="novo-chamado"><i>▧</i><b>Abrir chamado</b><span>Informe um problema</span></button>
+      <button data-action="qr"><i>⌗</i><b>Escanear QR</b><span>Conectar dispositivo</span></button>
+    </section>
+
+    <div class="columns">
+      <section class="panel">
+        <header><h3>Chamados Recentes</h3><button>Ver todos ›</button></header>
+        <div class="ticket high"><div class="icon">▣</div><div class="ticket-main"><b>NX-1048 <span class="risk high-r">ALTA</span></b><strong>Servidor de PDV indisponível</strong><small>Loja 024 · 12/08/2025 09:14</small></div><span class="state wait">AGUARDA SUA DECISÃO</span></div>
+        <div class="ticket medium"><div class="icon">⚙</div><div class="ticket-main"><b>NX-1047 <span class="risk med-r">MÉDIA</span></b><strong>Atualização de sistema</strong><small>Loja 017 · 12/08/2025 08:32</small></div><span class="state diag">EM DIAGNÓSTICO</span></div>
+        <div class="ticket low"><div class="icon">◫</div><div class="ticket-main"><b>NX-1046 <span class="risk low-r">BAIXA</span></b><strong>Limpeza de logs</strong><small>Loja 003 · 11/08/2025 21:18</small></div><span class="state done">✓ CONCLUÍDO</span></div>
+      </section>
+
+      <section class="panel approvals">
+        <header><h3>Aprovações Pendentes <span class="count">2</span></h3><button>Ver todas ›</button></header>
+        <article class="approval-card">
+          <div class="approval-head"><div class="icon">⌁</div><div><b>NX-1048 · Loja 024</b><strong>Reiniciar serviço de sincronização</strong><small>Esta ação pode afetar o PDV da loja.</small></div></div>
+          <div class="tags"><span class="danger">Risco: ALTA</span><span>Impacto: Serviços</span><span>Tempo est.: 5 min</span></div>
+          <div class="decision"><button class="approve" id="approveBtn">✓ APROVAR</button><button class="deny" id="denyBtn">× NEGAR</button></div>
+        </article>
+      </section>
+    </div>
+
+    <section class="system">
+      <header><h3>Status do Sistema</h3><button id="refreshStatus">Ver detalhes ›</button></header>
+      <div class="status-grid">
+        <div><i>◎</i><span><b>API / Gateway</b><small id="gatewayStatus">Verificando...</small></span></div>
+        <div><i>◫</i><span><b>Banco de Dados</b><small>● Local pronto</small></span></div>
+        <div><i>◉</i><span><b>NEXA IA</b><small>● Operacional</small></span></div>
+        <div><i>↻</i><span><b>Sincronização</b><small id="syncStatus">● Normal</small></span></div>
+      </div>
+    </section>
+
+    <section class="security-card"><div>♢</div><span><b>Tudo seguro e sob controle</b><small>Dados sensíveis permanecem protegidos e o envio offline exige autorização.</small></span><button>Ver segurança ›</button></section>
+  </main>
+
+  <section class="view-placeholder" id="secondaryView" hidden>
+    <button class="back" id="backBtn">‹ Voltar</button>
+    <h2 id="secondaryTitle">NEXA Mobile</h2>
+    <p id="secondaryText">Módulo em preparação para integração com o Gateway.</p>
+  </section>
+
+  <footer><b>NEXO INFORMÁTICA</b><span>◉ Suporte inteligente</span><span>◇ R11 LAB</span><span>▥ Segurança • Privacidade • Controle</span></footer>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
