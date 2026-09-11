@@ -19,8 +19,13 @@ export async function createPostgresStore(connectionString) {
       const { rows } = await pool.query(q, [licenseKeyHash, installId]);
       return rows[0] || null;
     },
-    async getIdempotent(requestId) { const { rows } = await pool.query('SELECT response_json AS response, action, company_id FROM nexo_idempotency WHERE request_id=$1 AND expires_at > now()', [requestId]); return rows[0] || null; },
-    async putIdempotent(requestId, action, auth, response) { await pool.query(`INSERT INTO nexo_idempotency(request_id,company_id,action,response_json,expires_at) VALUES($1,$2,$3,$4::jsonb,now()+interval '24 hours') ON CONFLICT(request_id) DO NOTHING`, [requestId, auth?.company_id || null, action, JSON.stringify(response)]); },
+    async getIdempotent(requestId) {
+      const { rows } = await pool.query('SELECT response_json AS response, action, company_id, license_id, install_id FROM nexo_idempotency WHERE request_id=$1 AND expires_at > now()', [requestId]);
+      return rows[0] || null;
+    },
+    async putIdempotent(requestId, action, auth, response) {
+      await pool.query(`INSERT INTO nexo_idempotency(request_id,company_id,license_id,install_id,action,response_json,expires_at) VALUES($1,$2,$3,$4,$5,$6::jsonb,now()+interval '24 hours') ON CONFLICT(request_id) DO NOTHING`, [requestId, auth?.company_id || null, auth?.license_id || null, auth?.install_id || null, action, JSON.stringify(response)]);
+    },
     async createTicket(auth, input) {
       const id = uuid(), now = new Date(), protocol = `SUP-${now.toISOString().slice(0,10).replaceAll('-','')}-${id.replaceAll('-','').slice(0,6).toUpperCase()}`;
       const { rows } = await pool.query(`INSERT INTO nexo_support_tickets(id,protocol,company_id,license_id,activation_id,install_id,local_protocol,category,priority,subject,description,status,owner,diagnostic,notifications)
