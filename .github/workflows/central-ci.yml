@@ -1,0 +1,42 @@
+name: NEXO Central CI
+
+on:
+  push:
+    branches: [nexo-central-prep-v2]
+    paths:
+      - "central/**"
+      - ".github/workflows/central-ci.yml"
+  pull_request:
+    paths:
+      - "central/**"
+      - ".github/workflows/central-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: central
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Syntax checks
+        run: |
+          node --check server.mjs
+          node --check src/core.mjs
+          node --check src/crypto.mjs
+          node --check src/store-memory.mjs
+          node --check src/store-postgres.mjs
+          node --check src/validation.mjs
+      - name: Central security and compatibility tests
+        run: npm test
