@@ -18,6 +18,7 @@ const PUBLIC_GATEWAY_URL = String(process.env.PUBLIC_GATEWAY_URL || '').trim();
 const PUBLIC_SUPPORT_URL = String(process.env.PUBLIC_SUPPORT_URL || PUBLIC_GATEWAY_URL).trim();
 const PUBLIC_API_URL = String(process.env.PUBLIC_API_URL || PUBLIC_GATEWAY_URL).trim();
 const UPSTREAM_URL = String(process.env.NEXO_UPSTREAM_URL || '').trim();
+const UPSTREAM_SHARED_SECRET = String(process.env.NEXO_UPSTREAM_SHARED_SECRET || '').trim();
 const PRIVATE_KEY_B64 = String(process.env.BOOTSTRAP_SIGNING_PRIVATE_KEY_PEM_B64 || '').trim();
 const PUBLIC_JWK_RAW = String(process.env.BOOTSTRAP_SIGNING_PUBLIC_JWK || '').trim();
 
@@ -67,9 +68,10 @@ async function readJson(req){
 async function proxyGateway(body,requestId){
   if(!UPSTREAM_URL)return {status:503,body:{ok:false,error:'CENTRAL_UPSTREAM_NOT_CONFIGURED'}};
   if(!validHttpsUrl(UPSTREAM_URL))return {status:503,body:{ok:false,error:'CENTRAL_UPSTREAM_REJECTED'}};
+  if(!UPSTREAM_SHARED_SECRET)return {status:503,body:{ok:false,error:'CENTRAL_AUTH_NOT_CONFIGURED'}};
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
   try{
-    const response=await fetch(UPSTREAM_URL,{method:'POST',headers:{'content-type':'application/json','accept':'application/json','x-nexo-request-id':requestId},body:JSON.stringify(body),signal:controller.signal,redirect:'error'});
+    const response=await fetch(UPSTREAM_URL,{method:'POST',headers:{'content-type':'application/json','accept':'application/json','x-nexo-request-id':requestId,'x-nexo-gateway-auth':UPSTREAM_SHARED_SECRET},body:JSON.stringify(body),signal:controller.signal,redirect:'error'});
     const text=await response.text();let parsed;try{parsed=text?JSON.parse(text):{}}catch{return {status:502,body:{ok:false,error:'CENTRAL_INVALID_RESPONSE'}}}
     return {status:response.status,body:parsed};
   }catch(error){return {status:502,body:{ok:false,error:error?.name==='AbortError'?'CENTRAL_TIMEOUT':'CENTRAL_UNREACHABLE'}}}
@@ -107,7 +109,7 @@ const server=http.createServer(async(req,res)=>{
     const url=new URL(req.url||'/','http://local');
     if(req.method==='GET'&&url.pathname==='/mobile'){res.writeHead(308,{location:'/mobile/'});return res.end()}
     if(req.method==='GET'&&url.pathname.startsWith('/mobile/')){if(await serveMobile(res,url.pathname))return}
-    if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'NEXO Gateway',version:'0.2.0-mobile',bootstrap_configured:Boolean(PRIVATE_KEY_B64&&publicJwk()),upstream_configured:Boolean(UPSTREAM_URL),mobile_path:'/mobile/',time:new Date().toISOString()});
+    if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'NEXO Gateway',version:'0.2.0-mobile',bootstrap_configured:Boolean(PRIVATE_KEY_B64&&publicJwk()),upstream_configured:Boolean(UPSTREAM_URL),upstream_auth_configured:Boolean(UPSTREAM_SHARED_SECRET),mobile_path:'/mobile/',time:new Date().toISOString()});
     if(req.method==='GET'&&(url.pathname==='/v1/bootstrap'||url.pathname==='/bootstrap'))return json(res,200,{ok:true,envelope:bootstrapEnvelope(),request_id:requestId});
     const gatewayPaths=new Set(['/','/gateway','/v1/gateway','/support','/license']);
     if(req.method==='POST'&&gatewayPaths.has(url.pathname)){
@@ -125,4 +127,4 @@ const server=http.createServer(async(req,res)=>{
     return json(res,status,{ok:false,error:safe,request_id:requestId});
   }
 });
-server.listen(PORT,'0.0.0.0',()=>console.log(JSON.stringify({event:'NEXO_GATEWAY_READY',port:PORT,bootstrap_version:BOOTSTRAP_VERSION,upstream_configured:Boolean(UPSTREAM_URL),mobile_path:'/mobile/'})));
+server.listen(PORT,'0.0.0.0',()=>console.log(JSON.stringify({event:'NEXO_GATEWAY_READY',port:PORT,bootstrap_version:BOOTSTRAP_VERSION,upstream_configured:Boolean(UPSTREAM_URL),upstream_auth_configured:Boolean(UPSTREAM_SHARED_SECRET),mobile_path:'/mobile/'})));
