@@ -19,3 +19,12 @@ test('mobile manifest is served',async()=>{const r=await fetch(`${base}/mobile/m
 test('bootstrap envelope is signed with P-256',async()=>{const r=await fetch(`${base}/v1/bootstrap`);assert.equal(r.status,200);const data=await r.json();const [p,s,extra]=String(data.envelope.compact).split('.');assert.ok(p&&s&&!extra);const signature=Buffer.from(s,'base64url');assert.equal(signature.length,64);assert.equal(crypto.verify('sha256',Buffer.from(p),{key:publicKey,dsaEncoding:'ieee-p1363'},signature),true);const payload=JSON.parse(Buffer.from(p,'base64url').toString('utf8'));assert.equal(payload.gateway_url,'https://gateway.example.test')});
 test('gateway fails closed until Central upstream exists',async()=>{const r=await fetch(`${base}/v1/gateway`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'support_status'})});assert.equal(r.status,503);const data=await r.json();assert.equal(data.error,'CENTRAL_UPSTREAM_NOT_CONFIGURED')});
 test('invalid gateway action is rejected',async()=>{const r=await fetch(`${base}/v1/gateway`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'../../bad'})});assert.equal(r.status,400);const data=await r.json();assert.equal(data.error,'INVALID_ACTION')});
+
+
+test('iOS LAB endpoints are enabled only when flag is present', async () => {
+  const r = await fetch(`${base}/v1/mobile/lab/enroll/challenge`, { method: 'POST' });
+  assert.equal(r.status, 200);
+  const data = await r.json();
+  assert.equal(data.ok, true);
+  assert.equal(data.challenge.schema, 'NEXO_MOBILE_ENROLL_CHALLENGE_V1');
+});
