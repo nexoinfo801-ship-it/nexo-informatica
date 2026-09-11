@@ -50,3 +50,8 @@ O container não fixa/expoõe uma porta de aplicação: o processo escuta em `0.
 ## Estado atual
 
 `PREP`: gateway alinhado ao deploy por Dockerfile, Node 22, healthcheck `/health` e porta dinâmica da plataforma. Publicação, domínio customizado/DNS e ligação ao `NEXO_UPSTREAM_URL` continuam como gates externos.
+
+
+## Mobile integrado
+
+A NEXA Mobile é servida pelo próprio Gateway em `/mobile/`, usando o mesmo origin para `/health` e `/v1/bootstrap`. Isso reduz CORS, configuração duplicada e custo operacional.
