@@ -55,3 +55,8 @@ O container não fixa/expoõe uma porta de aplicação: o processo escuta em `0.
 ## Mobile integrado
 
 A NEXA Mobile é servida pelo próprio Gateway em `/mobile/`, usando o mesmo origin para `/health` e `/v1/bootstrap`. Isso reduz CORS, configuração duplicada e custo operacional.
+
+
+## iOS Field Candidate
+
+A partir da geração 0.3.0-ios-lab, o Gateway inclui endpoints móveis protegidos por `MOBILE_LAB_ENABLED=true` para enrollment e aprovação assinada no iPhone.
