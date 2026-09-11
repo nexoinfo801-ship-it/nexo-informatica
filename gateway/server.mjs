@@ -14,6 +14,7 @@ const PUBLIC_GATEWAY_URL = String(process.env.PUBLIC_GATEWAY_URL || '').trim();
 const PUBLIC_SUPPORT_URL = String(process.env.PUBLIC_SUPPORT_URL || PUBLIC_GATEWAY_URL).trim();
 const PUBLIC_API_URL = String(process.env.PUBLIC_API_URL || PUBLIC_GATEWAY_URL).trim();
 const UPSTREAM_URL = String(process.env.NEXO_UPSTREAM_URL || '').trim();
+const UPSTREAM_SHARED_SECRET = String(process.env.NEXO_UPSTREAM_SHARED_SECRET || '').trim();
 const PRIVATE_KEY_B64 = String(process.env.BOOTSTRAP_SIGNING_PRIVATE_KEY_PEM_B64 || '').trim();
 const PUBLIC_JWK_RAW = String(process.env.BOOTSTRAP_SIGNING_PUBLIC_JWK || '').trim();
 
@@ -130,6 +131,7 @@ async function readJson(req) {
 async function proxyGateway(body, requestId) {
   if (!UPSTREAM_URL) return { status: 503, body: { ok: false, error: 'CENTRAL_UPSTREAM_NOT_CONFIGURED' } };
   if (!validHttpsUrl(UPSTREAM_URL)) return { status: 503, body: { ok: false, error: 'CENTRAL_UPSTREAM_REJECTED' } };
+  if (!UPSTREAM_SHARED_SECRET) return { status: 503, body: { ok: false, error: 'CENTRAL_AUTH_NOT_CONFIGURED' } };
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
@@ -140,6 +142,7 @@ async function proxyGateway(body, requestId) {
         'content-type': 'application/json',
         'accept': 'application/json',
         'x-nexo-request-id': requestId,
+        'x-nexo-gateway-auth': UPSTREAM_SHARED_SECRET,
       },
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -183,6 +186,7 @@ const server = http.createServer(async (req, res) => {
         version: '0.1.0-prep',
         bootstrap_configured: Boolean(PRIVATE_KEY_B64 && publicJwk()),
         upstream_configured: Boolean(UPSTREAM_URL),
+        upstream_auth_configured: Boolean(UPSTREAM_SHARED_SECRET),
         time: new Date().toISOString(),
       });
     }
@@ -216,5 +220,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(JSON.stringify({ event: 'NEXO_GATEWAY_READY', port: PORT, bootstrap_version: BOOTSTRAP_VERSION, upstream_configured: Boolean(UPSTREAM_URL) }));
+  console.log(JSON.stringify({ event: 'NEXO_GATEWAY_READY', port: PORT, bootstrap_version: BOOTSTRAP_VERSION, upstream_configured: Boolean(UPSTREAM_URL), upstream_auth_configured: Boolean(UPSTREAM_SHARED_SECRET) }));
 });
