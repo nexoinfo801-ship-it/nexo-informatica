@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+.git
+.github
+README.md
+railway.toml
