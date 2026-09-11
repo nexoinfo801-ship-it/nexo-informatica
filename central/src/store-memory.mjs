@@ -20,7 +20,9 @@ export class MemoryStore {
   }
 
   async getIdempotent(requestId) { return this.idempotency.get(requestId) || null; }
-  async putIdempotent(requestId, action, auth, response) { this.idempotency.set(requestId, { action, company_id: auth?.company_id || null, response }); }
+  async putIdempotent(requestId, action, auth, response) {
+    this.idempotency.set(requestId, { action, company_id: auth?.company_id || null, license_id: auth?.license_id || null, install_id: auth?.install_id || null, response });
+  }
 
   async createTicket(auth, input) {
     const id = uuid();
