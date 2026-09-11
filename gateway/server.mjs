@@ -11,6 +11,7 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) throw new Error('PORT_R
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MOBILE_ROOT = path.join(HERE, 'public', 'mobile');
+const PDV_MOBILE_ROOT = path.join(HERE, 'public', 'pdv-mobile');
 const MAX_BODY_BYTES = Math.max(16_384, Number(process.env.MAX_BODY_BYTES || 262_144));
 const RATE_LIMIT_WINDOW_MS = Math.max(10_000, Number(process.env.RATE_LIMIT_WINDOW_MS || 60_000));
 const RATE_LIMIT_MAX = Math.max(10, Number(process.env.RATE_LIMIT_MAX || 120));
@@ -120,6 +121,24 @@ async function proxyGateway(body,requestId){
 }
 
 const MIME={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon'};
+async function serveStaticRoot(res,urlPath,prefix,rootDir){
+  const relative=urlPath===prefix||urlPath===prefix+'/'?'index.html':urlPath.slice((prefix+'/').length);
+  const normalized=path.posix.normalize('/'+relative).slice(1);
+  if(normalized.startsWith('..'))return false;
+  const full=path.join(rootDir,...normalized.split('/'));
+  const root=path.resolve(rootDir)+path.sep;
+  const resolved=path.resolve(full);
+  if(!resolved.startsWith(root)&&resolved!==path.resolve(rootDir))return false;
+  try{
+    const data=await fs.readFile(resolved);
+    const ext=path.extname(resolved).toLowerCase();
+    res.writeHead(200,{
+      'content-type':MIME[ext]||'application/octet-stream','content-length':data.length,
+      'cache-control':ext==='.html'?'no-cache':'public, max-age=300','x-content-type-options':'nosniff','referrer-policy':'no-referrer',
+      'content-security-policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    });res.end(data);return true;
+  }catch{return false}
+}
 async function serveMobile(res,urlPath){
   const relative=urlPath==='/mobile'||urlPath==='/mobile/'?'index.html':urlPath.slice('/mobile/'.length);
   const normalized=path.posix.normalize('/'+relative).slice(1);
@@ -150,7 +169,9 @@ const server=http.createServer(async(req,res)=>{
     const url=new URL(req.url||'/','http://local');
     if(req.method==='GET'&&url.pathname==='/mobile'){res.writeHead(308,{location:'/mobile/'});return res.end()}
     if(req.method==='GET'&&url.pathname.startsWith('/mobile/')){if(await serveMobile(res,url.pathname))return}
-    if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'NEXO Gateway',version:'0.4.0-hub-lab',bootstrap_configured:Boolean(PRIVATE_KEY_B64&&publicJwk()),upstream_configured:Boolean(UPSTREAM_URL),communication_hub_configured:communicationHub.configured(),communication_hub:'/v1/hub/protocol',compatibility_id:COMPATIBILITY_ID,mobile_path:'/mobile/',mobile_lab_enabled:MOBILE_LAB_ENABLED,time:new Date().toISOString()});
+    if(req.method==='GET'&&url.pathname==='/pdv-mobile'){res.writeHead(308,{location:'/pdv-mobile/'});return res.end()}
+    if(req.method==='GET'&&url.pathname.startsWith('/pdv-mobile/')){if(await serveStaticRoot(res,url.pathname,'/pdv-mobile',PDV_MOBILE_ROOT))return}
+    if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'NEXO Gateway',version:'0.4.0-hub-lab',bootstrap_configured:Boolean(PRIVATE_KEY_B64&&publicJwk()),upstream_configured:Boolean(UPSTREAM_URL),communication_hub_configured:communicationHub.configured(),communication_hub:'/v1/hub/protocol',compatibility_id:COMPATIBILITY_ID,mobile_path:'/mobile/',pdv_mobile_path:'/pdv-mobile/',mobile_lab_enabled:MOBILE_LAB_ENABLED,time:new Date().toISOString()});
     if(req.method==='GET'&&(url.pathname==='/v1/bootstrap'||url.pathname==='/bootstrap'))return json(res,200,{ok:true,envelope:bootstrapEnvelope(),request_id:requestId});
     if(req.method==='GET'&&url.pathname==='/v1/hub/protocol')return json(res,200,{ok:true,protocol:communicationHub.protocol(),request_id:requestId});
     if(req.method==='GET'&&url.pathname==='/v1/hub/status')return json(res,200,{ok:true,hub:communicationHub.status(),request_id:requestId});
