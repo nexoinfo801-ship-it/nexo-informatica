@@ -1,0 +1,10 @@
+{
+  "name":"NEXA Mobile",
+  "short_name":"NEXA",
+  "start_url":"./",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#020b14",
+  "theme_color":"#03101e",
+  "description":"NEXA Mobile — suporte inteligente, chamados e aprovações seguras do ecossistema NEXO."
+}
