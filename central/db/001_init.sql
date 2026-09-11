@@ -63,7 +63,9 @@ CREATE TABLE IF NOT EXISTS nexo_support_messages (
 
 CREATE TABLE IF NOT EXISTS nexo_idempotency (
   request_id text PRIMARY KEY,
-  company_id uuid REFERENCES nexo_companies(id),
+  company_id uuid NOT NULL REFERENCES nexo_companies(id),
+  license_id uuid NOT NULL REFERENCES nexo_licenses(id),
+  install_id text NOT NULL,
   action text NOT NULL,
   response_json jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -99,5 +101,6 @@ CREATE INDEX IF NOT EXISTS idx_nexo_activation_install ON nexo_activations(insta
 CREATE INDEX IF NOT EXISTS idx_nexo_ticket_scope ON nexo_support_tickets(company_id,license_id,install_id,updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_nexo_message_ticket ON nexo_support_messages(ticket_id,created_at);
 CREATE INDEX IF NOT EXISTS idx_nexo_audit_scope ON nexo_audit_events(company_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_nexo_idempotency_scope ON nexo_idempotency(company_id,license_id,install_id,expires_at);
 CREATE INDEX IF NOT EXISTS idx_nexo_idempotency_expiry ON nexo_idempotency(expires_at);
 COMMIT;
