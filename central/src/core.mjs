@@ -36,6 +36,12 @@ async function authenticated(body, store) {
   return auth;
 }
 
+function sameIdempotencyScope(previous, auth) {
+  return String(previous?.company_id || '') === String(auth?.company_id || '')
+    && String(previous?.license_id || '') === String(auth?.license_id || '')
+    && String(previous?.install_id || '') === String(auth?.install_id || '');
+}
+
 function licensePayload(auth, config) {
   const st = V.status(auth.status || auth.license_status || 'ACTIVE');
   const blocking = st !== 'ACTIVE';
@@ -68,13 +74,15 @@ export function buildCentral({ store, config = {} }) {
 
     if (action === 'health') return { status: 200, body: { ok:true, service:'NEXO Central', version:'0.1.0-prep', database:'configured', time:new Date().toISOString() } };
 
+    // Authentication happens before idempotency lookup. A known request_id must never
+    // become a bearer credential capable of replaying another installation's response.
+    const auth = await authenticated(body, store);
     const previous = await store.getIdempotent(rid);
     if (previous) {
-      if (previous.action !== action) throw V.bad('REQUEST_ID_REUSED', 409);
+      if (previous.action !== action || !sameIdempotencyScope(previous, auth)) throw V.bad('REQUEST_ID_REUSED', 409);
       return { status: 200, body: previous.response };
     }
 
-    const auth = await authenticated(body, store);
     let response;
 
     if (action === 'support_create') {
