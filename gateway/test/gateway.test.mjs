@@ -9,7 +9,7 @@ const {privateKey,publicKey}=crypto.generateKeyPairSync('ec',{namedCurve:'P-256'
 const privatePem=privateKey.export({type:'pkcs8',format:'pem'});
 const jwk=publicKey.export({format:'jwk'});
 const port=await freePort(),base=`http://127.0.0.1:${port}`;
-const child=spawn(process.execPath,['server.mjs'],{cwd:new URL('..',import.meta.url),env:{...process.env,PORT:String(port),PUBLIC_GATEWAY_URL:'https://gateway.example.test',PUBLIC_SUPPORT_URL:'https://gateway.example.test',PUBLIC_API_URL:'https://gateway.example.test',BOOTSTRAP_SIGNING_PRIVATE_KEY_PEM_B64:Buffer.from(privatePem).toString('base64'),BOOTSTRAP_SIGNING_PUBLIC_JWK:JSON.stringify(jwk)},stdio:['ignore','pipe','pipe']});
+const child=spawn(process.execPath,['server.mjs'],{cwd:new URL('..',import.meta.url),env:{...process.env,PORT:String(port),PUBLIC_GATEWAY_URL:'https://gateway.example.test',PUBLIC_SUPPORT_URL:'https://gateway.example.test',PUBLIC_API_URL:'https://gateway.example.test',BOOTSTRAP_SIGNING_PRIVATE_KEY_PEM_B64:Buffer.from(privatePem).toString('base64'),BOOTSTRAP_SIGNING_PUBLIC_JWK:JSON.stringify(jwk),MOBILE_LAB_ENABLED:'true'},stdio:['ignore','pipe','pipe']});
 await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('server timeout')),5000);child.stdout.on('data',d=>{if(String(d).includes('NEXO_GATEWAY_READY')){clearTimeout(timer);resolve()}});child.on('exit',code=>reject(new Error(`server exited ${code}`)))});
 test.after(()=>child.kill('SIGTERM'));
 
