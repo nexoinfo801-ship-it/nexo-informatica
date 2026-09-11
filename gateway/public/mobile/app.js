@@ -94,3 +94,9 @@ qs('#approveBtn').addEventListener('click',fieldApprove);
 qs('#denyBtn').addEventListener('click',()=>showToast('DENY será ligado ao próximo challenge do MASTER.'));
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+qsa('.daily-grid button').forEach(b=>b.addEventListener('click',()=>{
+ const a=b.dataset.action;
+ const map={clientes:'Clientes conectados serão carregados pela Central NEXO.',chamados:'Abrindo acompanhamento de chamados.',remoto:'Acesso remoto exige autorização explícita do cliente.',nexa:'NEXA pronta para orientar o atendimento.'};
+ showToast(map[a]||'Ação preparada.');
+}));
