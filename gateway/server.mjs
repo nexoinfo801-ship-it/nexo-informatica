@@ -2,7 +2,10 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { URL } from 'node:url';
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT);
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+  throw new Error('PORT_REQUIRED');
+}
 const MAX_BODY_BYTES = Math.max(16_384, Number(process.env.MAX_BODY_BYTES || 262_144));
 const RATE_LIMIT_WINDOW_MS = Math.max(10_000, Number(process.env.RATE_LIMIT_WINDOW_MS || 60_000));
 const RATE_LIMIT_MAX = Math.max(10, Number(process.env.RATE_LIMIT_MAX || 120));
