@@ -1,4 +1,5 @@
 @import url("./suite-r33.css");
+@import url("./suite-r34.css");
 .module-view{min-height:62svh;border:1px solid #123b60;border-radius:20px;background:linear-gradient(160deg,#061727,#03111e);padding:18px;box-shadow:0 20px 55px rgba(0,0,0,.28)}
 .module-top{display:flex;align-items:center;gap:12px;margin-bottom:16px}.module-top h2{margin:0;font-size:24px}.module-top .back{border:1px solid #16496f;background:#082039;border-radius:10px;padding:9px 12px;cursor:pointer}
 .module-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.module-toolbar button,.report-actions button,.profile-actions button,.thread-head button,.composer button{border:1px solid #18527e;background:#0a2035;border-radius:11px;padding:11px 14px;cursor:pointer}.primary{background:linear-gradient(180deg,#148dff,#0868ca)!important;border-color:#38a7ff!important;font-weight:800}.danger-outline{border-color:#8f3640!important;color:#ff9299!important}
