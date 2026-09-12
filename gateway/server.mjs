@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { URL } from 'node:url';
 import { createCommunicationHub } from './hub.mjs';
+import { databaseHealth } from './db.mjs';
 
 const PORT = Number(process.env.PORT);
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) throw new Error('PORT_REQUIRED');
@@ -171,7 +172,7 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==='GET'&&url.pathname.startsWith('/mobile/')){if(await serveMobile(res,url.pathname))return}
     if(req.method==='GET'&&url.pathname==='/pdv-mobile'){res.writeHead(308,{location:'/pdv-mobile/'});return res.end()}
     if(req.method==='GET'&&url.pathname.startsWith('/pdv-mobile/')){if(await serveStaticRoot(res,url.pathname,'/pdv-mobile',PDV_MOBILE_ROOT))return}
-    if(req.method==='GET'&&url.pathname==='/health')return json(res,200,{ok:true,service:'NEXO Gateway',version:'0.4.0-hub-lab',bootstrap_configured:Boolean(PRIVATE_KEY_B64&&publicJwk()),upstream_configured:Boolean(UPSTREAM_URL),communication_hub_configured:communicationHub.configured(),communication_hub:'/v1/hub/protocol',compatibility_id:COMPATIBILITY_ID,mobile_path:'/mobile/',pdv_mobile_path:'/pdv-mobile/',mobile_lab_enabled:MOBILE_LAB_ENABLED,time:new Date().toISOString()});
+    if(req.method==='GET'&&url.pathname==='/health'){const database=await databaseHealth();return json(res,200,{ok:true,service:'NEXO Gateway',version:'0.4.0-hub-lab',bootstrap_configured:Boolean(PRIVATE_KEY_B64&&publicJwk()),upstream_configured:Boolean(UPSTREAM_URL),communication_hub_configured:communicationHub.configured(),communication_hub:'/v1/hub/protocol',compatibility_id:COMPATIBILITY_ID,mobile_path:'/mobile/',pdv_mobile_path:'/pdv-mobile/',mobile_lab_enabled:MOBILE_LAB_ENABLED,database,time:new Date().toISOString()});}
     if(req.method==='GET'&&(url.pathname==='/v1/bootstrap'||url.pathname==='/bootstrap'))return json(res,200,{ok:true,envelope:bootstrapEnvelope(),request_id:requestId});
     if(req.method==='GET'&&url.pathname==='/v1/hub/protocol')return json(res,200,{ok:true,protocol:communicationHub.protocol(),request_id:requestId});
     if(req.method==='GET'&&url.pathname==='/v1/hub/status')return json(res,200,{ok:true,hub:communicationHub.status(),request_id:requestId});
