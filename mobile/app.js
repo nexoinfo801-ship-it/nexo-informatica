@@ -59,3 +59,7 @@ qs('#approveBtn').addEventListener('click',()=>showToast('LAB: aprovação real 
 qs('#denyBtn').addEventListener('click',()=>showToast('LAB: negação real aguardará challenge assinado do MASTER.'));
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+const composer=qs('#composer'), feed=qs('#conversationFeed'), input=qs('#messageInput');
+function addBubble(text,kind){const el=document.createElement('div');el.className='bubble '+kind;el.textContent=text;feed.append(el);feed.scrollTop=feed.scrollHeight;}
+composer?.addEventListener('submit',(e)=>{e.preventDefault();const value=input.value.trim();if(!value)return;addBubble(value,'user');input.value='';setTimeout(()=>addBubble('Entendi. Vou organizar o contexto, indicar as evidências necessárias e pedir sua confirmação antes de qualquer ação que altere dados.','assistant'),350)});
