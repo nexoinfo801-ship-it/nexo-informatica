@@ -2,7 +2,7 @@ name: NEXO Gateway CI
 
 on:
   push:
-    branches: [nexo-gateway-prep]
+    branches: [nexo-gateway-prep, nexo-suite-r33-lab]
     paths:
       - "gateway/**"
       - ".github/workflows/gateway-ci.yml"
