@@ -91,10 +91,16 @@
     <section class="security-card"><div>♢</div><span><b>Tudo seguro e sob controle</b><small>Dados sensíveis permanecem protegidos e o envio offline exige autorização.</small></span><button>Ver segurança ›</button></section>
   </main>
 
-  <section class="view-placeholder" id="secondaryView" hidden>
-    <button class="back" id="backBtn">‹ Voltar</button>
-    <h2 id="secondaryTitle">NEXA Mobile</h2>
-    <p id="secondaryText">Módulo em preparação para integração com o Gateway.</p>
+  <section class="view-placeholder nexa-workspace" id="secondaryView" hidden>
+    <div class="workspace-head"><button class="back" id="backBtn">‹ Voltar</button><span class="workspace-state"><i></i> NEXA pronta</span></div>
+    <div class="workspace-grid">
+      <div class="conversation-card">
+        <div class="conversation-head"><div class="avatar-small">N</div><div><h2 id="secondaryTitle">Conversa com a NEXA</h2><p id="secondaryText">Contexto seguro, resposta clara e próximo passo objetivo.</p></div></div>
+        <div class="conversation-feed" id="conversationFeed"><div class="bubble assistant">Olá, Everton. Posso analisar um problema, organizar um chamado ou explicar o status do NEXO.<small>Agora • contexto local</small></div></div>
+        <form class="composer" id="composer"><input id="messageInput" autocomplete="off" placeholder="Descreva o que está acontecendo..." aria-label="Mensagem para a NEXA"><button type="submit" aria-label="Enviar mensagem">Enviar</button></form>
+      </div>
+      <aside class="context-card"><span class="eyebrow">CONTEXTO DA SESSÃO</span><h3>Atendimento assistido</h3><div><b>Origem</b><small>iPhone / PWA</small></div><div><b>Modo</b><small>Offline-first</small></div><div><b>Privacidade</b><small>Envio manual</small></div><button data-action="diagnostico">Executar diagnóstico</button></aside>
+    </div>
   </section>
 
   <footer><b>NEXO INFORMÁTICA</b><span>◉ Suporte inteligente</span><span>◇ R11 LAB</span><span>▥ Segurança • Privacidade • Controle</span></footer>
