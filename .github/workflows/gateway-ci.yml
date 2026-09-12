@@ -18,6 +18,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nexo
+          POSTGRES_PASSWORD: nexo_ci_password
+          POSTGRES_DB: nexo_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U nexo -d nexo_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      TEST_DATABASE_URL: postgresql://nexo:nexo_ci_password@127.0.0.1:5432/nexo_ci
     defaults:
       run:
         working-directory: gateway
@@ -34,5 +50,5 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Syntax check
         run: node --check server.mjs && node --check hub.mjs && node --check hub_store.mjs
-      - name: Test gateway + mobile integration
+      - name: Test gateway + mobile + Postgres persistence
         run: npm test
