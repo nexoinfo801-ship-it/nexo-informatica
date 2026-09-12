@@ -34,3 +34,4 @@ jobs:
         run: node --check server.mjs
       - name: Test gateway + mobile integration
         run: npm test
+# NEXO Suite R3.4 LAB full gate marker
