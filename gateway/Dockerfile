@@ -4,6 +4,7 @@ COPY package.json ./
 RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund
 COPY server.mjs ./server.mjs
 COPY hub.mjs ./hub.mjs
+COPY hub_store.mjs ./hub_store.mjs
 COPY public ./public
 COPY test ./test
 RUN npm test
