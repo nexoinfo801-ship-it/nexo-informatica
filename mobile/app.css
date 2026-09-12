@@ -29,3 +29,15 @@ footer{display:flex;gap:30px;align-items:center;border-top:1px solid #0c3454;mar
 @media(max-width:850px){.app-shell{padding-left:14px;padding-right:14px}.topbar{align-items:flex-start}.brand-mark{font-size:29px}.brand-sep{display:none}.brand>div:last-child span{display:none}.online-pill small,.profile div{display:none}.tabs{grid-template-columns:repeat(6,1fr)}.tab{min-height:60px}.tab span{display:none}.tab em{right:6px}.hero{grid-template-columns:110px 1fr}.assistant-orb{width:100px;height:100px;margin-left:12px}.assistant-orb span{font-size:42px}.hero-copy{padding:18px 12px}.hero h1{font-size:30px}.hero h2{font-size:16px}.hero blockquote{font-size:15px;margin:14px 0}.hero-benefits{gap:12px;flex-wrap:wrap;font-size:11px}.device-card{grid-column:1/-1;margin:0 12px 12px;display:grid;grid-template-columns:1fr 1fr}.device-card>small,.device-card>strong{display:none}.quick-grid{grid-template-columns:1fr 1fr}.columns{grid-template-columns:1fr}.status-grid{grid-template-columns:1fr 1fr}footer{flex-wrap:wrap;gap:12px}.ticket{grid-template-columns:48px 1fr}.state{grid-column:2}.security-card button{display:none}}
 @media(max-width:460px){.top-actions{gap:6px}.online-pill{padding:8px 10px}.profile{padding:5px}.brand strong{font-size:17px}.hero{min-height:300px}.assistant-orb{width:86px;height:86px}.hero h1{font-size:27px}.quick-grid button{padding:12px}.quick-grid i{width:40px;height:40px;font-size:24px}.ticket{padding-right:10px}.status-grid{grid-template-columns:1fr}.device-card{grid-template-columns:1fr 1fr}.panel h3,.system h3{font-size:19px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+
+/* NEXO Visual System R3.5 — acabamento de campo */
+:root{--radius-lg:20px;--focus:#8bd8ff;--blue-bright:#2aa7ff}
+body{letter-spacing:.005em}
+button,.btn,a{transition:transform .16s ease,background .16s ease,border-color .16s ease,box-shadow .16s ease}
+button:hover{transform:translateY(-1px);border-color:var(--blue-bright)!important;box-shadow:0 10px 24px rgba(0,132,255,.16)}
+button:active{transform:translateY(0) scale(.985)}
+button:focus-visible,a:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+.panel,.system,.security-card{box-shadow:0 14px 34px rgba(0,0,0,.18)}
+.panel header,.system header{padding-bottom:10px;border-bottom:1px solid rgba(31,113,169,.28)}
+.status-grid>div{min-height:68px}
+@media(max-width:850px){.app-shell{padding-top:max(14px,env(safe-area-inset-top))}.topbar{padding-bottom:16px}.tabs{position:sticky;top:0;z-index:4;backdrop-filter:blur(16px);box-shadow:0 8px 22px rgba(0,0,0,.22)}}
