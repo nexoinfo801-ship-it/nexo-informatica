@@ -13,6 +13,7 @@ if(!Number.isInteger(PORT)||PORT<1||PORT>65535)throw new Error('PORT_REQUIRED');
 const HERE=path.dirname(fileURLToPath(import.meta.url));
 const MOBILE_ROOT=path.join(HERE,'public','mobile');
 const PDV_MOBILE_ROOT=path.join(HERE,'public','pdv-mobile');
+const DIVULGACAO_ROOT=path.join(HERE,'public','divulgacao');
 const MAX_BODY_BYTES=Math.max(16384,Number(process.env.MAX_BODY_BYTES||262144));
 const RATE_LIMIT_WINDOW_MS=Math.max(10000,Number(process.env.RATE_LIMIT_WINDOW_MS||60000));
 const RATE_LIMIT_MAX=Math.max(10,Number(process.env.RATE_LIMIT_MAX||120));
@@ -59,6 +60,8 @@ const server=http.createServer(async(req,res)=>{const requestId=String(req.heade
   if(req.method==='GET'&&url.pathname.startsWith('/mobile/')){if(await serveStaticRoot(res,url.pathname,'/mobile',MOBILE_ROOT))return;}
   if(req.method==='GET'&&url.pathname==='/pdv-mobile'){res.writeHead(308,{location:'/pdv-mobile/'});return res.end();}
   if(req.method==='GET'&&url.pathname.startsWith('/pdv-mobile/')){if(await serveStaticRoot(res,url.pathname,'/pdv-mobile',PDV_MOBILE_ROOT))return;}
+  if(req.method==='GET'&&url.pathname==='/divulgacao'){res.writeHead(308,{location:'/divulgacao/'});return res.end();}
+  if(req.method==='GET'&&url.pathname.startsWith('/divulgacao/')){if(await serveStaticRoot(res,url.pathname,'/divulgacao',DIVULGACAO_ROOT))return;}
   if(req.method==='GET'&&url.pathname==='/health'){const hs=await communicationHub.status();const bootstrap=Boolean(PRIVATE_KEY_B64&&publicJwk());const commercialReady=bootstrap&&communicationHub.configured()&&hs.persistence==='POSTGRES';return json(res,200,{ok:true,service:'NEXO Gateway',version:VERSION,bootstrap_configured:bootstrap,upstream_configured:Boolean(UPSTREAM_URL),communication_hub_configured:communicationHub.configured(),communication_hub_persistence:hs.persistence,commercial_ready:commercialReady,communication_hub:'/v1/hub/protocol',compatibility_id:COMPATIBILITY_ID,mobile_path:'/mobile/',pdv_mobile_path:'/pdv-mobile/',mobile_lab_enabled:MOBILE_LAB_ENABLED,time:new Date().toISOString()});}
   if(req.method==='GET'&&(url.pathname==='/v1/bootstrap'||url.pathname==='/bootstrap'))return json(res,200,{ok:true,envelope:bootstrapEnvelope(),request_id:requestId});
   if(req.method==='GET'&&url.pathname==='/v1/hub/protocol')return json(res,200,{ok:true,protocol:communicationHub.protocol(),request_id:requestId});
