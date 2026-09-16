@@ -109,7 +109,24 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
                 FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
             );
 
-            PRAGMA user_version=2;
+            CREATE TABLE IF NOT EXISTS cash_adjustments (
+                id TEXT PRIMARY KEY NOT NULL,
+                cash_session_id TEXT NOT NULL,
+                kind INTEGER NOT NULL,
+                amount TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                FOREIGN KEY (cash_session_id) REFERENCES cash_sessions(id) ON DELETE RESTRICT
+            );
+
+            CREATE TABLE IF NOT EXISTS cash_closings (
+                cash_session_id TEXT PRIMARY KEY NOT NULL,
+                expected_cash TEXT NOT NULL,
+                actual_cash TEXT NOT NULL,
+                difference TEXT NOT NULL,
+                FOREIGN KEY (cash_session_id) REFERENCES cash_sessions(id) ON DELETE RESTRICT
+            );
+
+            PRAGMA user_version=3;
             """;
         await schema.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -203,6 +220,247 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
         command.Parameters.AddWithValue("$openingBalance", ToStorageDecimal(session.OpeningBalance));
         command.Parameters.AddWithValue("$isOpen", session.IsOpen ? 1 : 0);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task SaveCashAdjustmentAsync(
+        EntityId<CashSession> cashSessionId,
+        CashMovement movement,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(movement);
+
+        if (movement.Kind is not (CashMovementKind.Supply or CashMovementKind.Withdrawal))
+        {
+            throw new InvalidOperationException("Only manual cash adjustments can be persisted with this operation.");
+        }
+
+        if (movement.SaleId is not null)
+        {
+            throw new InvalidOperationException("Manual cash adjustments cannot reference a sale.");
+        }
+
+        if (string.IsNullOrWhiteSpace(movement.Reason))
+        {
+            throw new InvalidOperationException("Cash adjustment reason is required.");
+        }
+
+        if (movement.Kind == CashMovementKind.Supply && movement.Amount <= 0m)
+        {
+            throw new InvalidOperationException("Supply amount must be positive.");
+        }
+
+        if (movement.Kind == CashMovementKind.Withdrawal && movement.Amount >= 0m)
+        {
+            throw new InvalidOperationException("Withdrawal amount must be negative.");
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+
+        try
+        {
+            var session = await ReadCashSessionAsync(
+                connection,
+                transaction,
+                cashSessionId,
+                cancellationToken);
+
+            if (!session.IsOpen)
+            {
+                throw new InvalidOperationException("Cash session is closed.");
+            }
+
+            if (movement.Kind == CashMovementKind.Withdrawal)
+            {
+                var expectedBalance = await ReadExpectedCashBalanceAsync(
+                    connection,
+                    transaction,
+                    cashSessionId,
+                    cancellationToken);
+
+                if (expectedBalance + movement.Amount < 0m)
+                {
+                    throw new InvalidOperationException("Withdrawal cannot make expected cash negative.");
+                }
+            }
+
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO cash_adjustments (id, cash_session_id, kind, amount, reason)
+                VALUES ($id, $cashSessionId, $kind, $amount, $reason);
+                """;
+            command.Parameters.AddWithValue("$id", movement.Id.ToString());
+            command.Parameters.AddWithValue("$cashSessionId", cashSessionId.ToString());
+            command.Parameters.AddWithValue("$kind", (int)movement.Kind);
+            command.Parameters.AddWithValue("$amount", ToStorageDecimal(movement.Amount));
+            command.Parameters.AddWithValue("$reason", movement.Reason);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<CashMovement>> GetCashAdjustmentsAsync(
+        EntityId<CashSession> cashSessionId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT id, kind, amount, reason
+            FROM cash_adjustments
+            WHERE cash_session_id = $cashSessionId
+            ORDER BY rowid;
+            """;
+        command.Parameters.AddWithValue("$cashSessionId", cashSessionId.ToString());
+
+        var result = new List<CashMovement>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(new CashMovement(
+                new EntityId<CashMovement>(Guid.Parse(reader.GetString(0))),
+                (CashMovementKind)reader.GetInt32(1),
+                null,
+                FromStorageDecimal(reader.GetString(2)),
+                reader.GetString(3)));
+        }
+
+        return result;
+    }
+
+    public async Task CloseCashSessionAsync(
+        EntityId<CashSession> cashSessionId,
+        CashClosing closing,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(closing);
+
+        if (closing.ActualCash < 0m)
+        {
+            throw new InvalidOperationException("Actual cash cannot be negative.");
+        }
+
+        if (closing.Difference != closing.ActualCash - closing.ExpectedCash)
+        {
+            throw new InvalidOperationException("Cash closing difference is inconsistent.");
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+
+        try
+        {
+            var session = await ReadCashSessionAsync(
+                connection,
+                transaction,
+                cashSessionId,
+                cancellationToken);
+
+            if (!session.IsOpen)
+            {
+                throw new InvalidOperationException("Cash session is already closed.");
+            }
+
+            var persistedExpected = await ReadExpectedCashBalanceAsync(
+                connection,
+                transaction,
+                cashSessionId,
+                cancellationToken);
+
+            if (persistedExpected != closing.ExpectedCash)
+            {
+                throw new InvalidOperationException("Cash closing expected balance does not match persisted ledger.");
+            }
+
+            await using (var insert = connection.CreateCommand())
+            {
+                insert.Transaction = transaction;
+                insert.CommandText = """
+                    INSERT INTO cash_closings (
+                        cash_session_id, expected_cash, actual_cash, difference)
+                    VALUES (
+                        $cashSessionId, $expectedCash, $actualCash, $difference);
+                    """;
+                insert.Parameters.AddWithValue("$cashSessionId", cashSessionId.ToString());
+                insert.Parameters.AddWithValue("$expectedCash", ToStorageDecimal(closing.ExpectedCash));
+                insert.Parameters.AddWithValue("$actualCash", ToStorageDecimal(closing.ActualCash));
+                insert.Parameters.AddWithValue("$difference", ToStorageDecimal(closing.Difference));
+                await insert.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await using (var update = connection.CreateCommand())
+            {
+                update.Transaction = transaction;
+                update.CommandText = """
+                    UPDATE cash_sessions
+                    SET is_open = 0
+                    WHERE id = $id AND is_open = 1;
+                    """;
+                update.Parameters.AddWithValue("$id", cashSessionId.ToString());
+                var affected = await update.ExecuteNonQueryAsync(cancellationToken);
+                if (affected != 1)
+                {
+                    throw new InvalidOperationException("Cash session could not be closed.");
+                }
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<bool> IsCashSessionOpenAsync(
+        EntityId<CashSession> cashSessionId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT is_open FROM cash_sessions WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", cashSessionId.ToString());
+
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+        if (value is null || value is DBNull)
+        {
+            throw new KeyNotFoundException($"Cash session {cashSessionId} was not found.");
+        }
+
+        return Convert.ToInt32(value, CultureInfo.InvariantCulture) == 1;
+    }
+
+    public async Task<CashClosing?> GetCashClosingAsync(
+        EntityId<CashSession> cashSessionId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT expected_cash, actual_cash, difference
+            FROM cash_closings
+            WHERE cash_session_id = $cashSessionId;
+            """;
+        command.Parameters.AddWithValue("$cashSessionId", cashSessionId.ToString());
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new CashClosing(
+            FromStorageDecimal(reader.GetString(0)),
+            FromStorageDecimal(reader.GetString(1)),
+            FromStorageDecimal(reader.GetString(2)));
     }
 
     public async Task<StoredProduct?> GetProductAsync(
@@ -393,34 +651,12 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
-
-        await using var sessionCommand = connection.CreateCommand();
-        sessionCommand.CommandText = "SELECT opening_balance FROM cash_sessions WHERE id = $id;";
-        sessionCommand.Parameters.AddWithValue("$id", cashSessionId.ToString());
-        var openingValue = await sessionCommand.ExecuteScalarAsync(cancellationToken);
-        if (openingValue is null || openingValue is DBNull)
-        {
-            throw new KeyNotFoundException($"Cash session {cashSessionId} was not found.");
-        }
-
-        var balance = FromStorageDecimal(
-            Convert.ToString(openingValue, CultureInfo.InvariantCulture)!);
-
-        await using var movementCommand = connection.CreateCommand();
-        movementCommand.CommandText = """
-            SELECT amount
-            FROM cash_movements
-            WHERE cash_session_id = $cashSessionId;
-            """;
-        movementCommand.Parameters.AddWithValue("$cashSessionId", cashSessionId.ToString());
-
-        await using var reader = await movementCommand.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            balance += FromStorageDecimal(reader.GetString(0));
-        }
-
-        return balance;
+        await using var transaction = connection.BeginTransaction(deferred: true);
+        return await ReadExpectedCashBalanceAsync(
+            connection,
+            transaction,
+            cashSessionId,
+            cancellationToken);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -464,6 +700,63 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
             CultureInfo.InvariantCulture);
         var isOpen = reader.GetInt32(1) == 1;
         return (businessDate, isOpen);
+    }
+
+    private static async Task<decimal> ReadExpectedCashBalanceAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        EntityId<CashSession> cashSessionId,
+        CancellationToken cancellationToken)
+    {
+        await using var sessionCommand = connection.CreateCommand();
+        sessionCommand.Transaction = transaction;
+        sessionCommand.CommandText = "SELECT opening_balance FROM cash_sessions WHERE id = $id;";
+        sessionCommand.Parameters.AddWithValue("$id", cashSessionId.ToString());
+        var openingValue = await sessionCommand.ExecuteScalarAsync(cancellationToken);
+        if (openingValue is null || openingValue is DBNull)
+        {
+            throw new InvalidOperationException($"Cash session {cashSessionId} was not found.");
+        }
+
+        var balance = FromStorageDecimal(
+            Convert.ToString(openingValue, CultureInfo.InvariantCulture)!);
+
+        balance += await SumCashTableAsync(
+            connection,
+            transaction,
+            "cash_movements",
+            cashSessionId,
+            cancellationToken);
+        balance += await SumCashTableAsync(
+            connection,
+            transaction,
+            "cash_adjustments",
+            cashSessionId,
+            cancellationToken);
+
+        return balance;
+    }
+
+    private static async Task<decimal> SumCashTableAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string tableName,
+        EntityId<CashSession> cashSessionId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"SELECT amount FROM {tableName} WHERE cash_session_id = $cashSessionId;";
+        command.Parameters.AddWithValue("$cashSessionId", cashSessionId.ToString());
+
+        var total = 0m;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            total += FromStorageDecimal(reader.GetString(0));
+        }
+
+        return total;
     }
 
     private static async Task InsertSaleAsync(
