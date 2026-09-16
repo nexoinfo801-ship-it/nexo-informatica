@@ -24,7 +24,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          $url = 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-e97c-820e-b9fd-91c27aff89b1/raw?se=2026-09-16T19%3A09%3A18Z&sp=r&sv=2026-02-06&sr=b&scid=e29b34b2-f441-5b3b-b83c-933988e0862c&skoid=a6356955-0ca0-4033-9150-c0c162458498&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T17%3A13%3A50Z&ske=2026-09-17T17%3A13%3A50Z&sks=b&skv=2026-02-06&sig=HmeKIxMkv/NggvAutGZGU96aDii5p5YTNBDFc8fZvJQ%3D'
+          $url = 'https://sdmntprnorthcentralus.oaiusercontent.com/files/00000000-7738-822f-a85a-06e4a6a7b2ee/raw?se=2026-09-16T19%3A29%3A36Z&sp=r&sv=2026-02-06&sr=b&scid=c07ab8de-facc-5dcf-8dec-10b6d629002a&skoid=a6356955-0ca0-4033-9150-c0c162458498&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T13%3A05%3A55Z&ske=2026-09-17T13%3A05%3A55Z&sks=b&skv=2026-02-06&sig=z32e0C734y4VfG48YkyM%2BJ5dADqn4QmIb41g3g2UsIs%3D'
           Invoke-WebRequest -Uri $url -OutFile source.zip -MaximumRedirection 10
           $expected = 'e703b4d643762301810690dcb560422eea5ccaebc2cae3c9b87be0af7dd7dc49'
           $actual = (Get-FileHash source.zip -Algorithm SHA256).Hash.ToLowerInvariant()
