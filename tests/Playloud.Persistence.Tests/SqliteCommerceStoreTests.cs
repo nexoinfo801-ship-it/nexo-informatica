@@ -8,16 +8,16 @@ public sealed class SqliteCommerceStoreTests : IAsyncLifetime
 {
     private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"playloud-{Guid.NewGuid():N}.db");
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         if (File.Exists(_databasePath))
         {
             File.Delete(_databasePath);
         }
 
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]
