@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Playloud.Domain</RootNamespace>
+    <AssemblyName>Playloud.Domain</AssemblyName>
+  </PropertyGroup>
+</Project>
