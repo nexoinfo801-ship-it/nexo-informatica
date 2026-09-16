@@ -1,0 +1,110 @@
+name: NEXO R23 Patch 4 Beta Windows x64
+
+on:
+  push:
+    branches:
+      - nexo-beta-r23-p4
+    paths:
+      - .github/workflows/nexo-beta-r23-p4.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-beta:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - name: Checkout beta branch
+        uses: actions/checkout@v4
+
+      - name: Download canonical R23 Patch 4 source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $url = 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-e97c-820e-b9fd-91c27aff89b1/raw?se=2026-09-16T19%3A09%3A18Z&sp=r&sv=2026-02-06&sr=b&scid=e29b34b2-f441-5b3b-b83c-933988e0862c&skoid=a6356955-0ca0-4033-9150-c0c162458498&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T17%3A13%3A50Z&ske=2026-09-17T17%3A13%3A50Z&sks=b&skv=2026-02-06&sig=HmeKIxMkv/NggvAutGZGU96aDii5p5YTNBDFc8fZvJQ%3D'
+          Invoke-WebRequest -Uri $url -OutFile source.zip -MaximumRedirection 10
+          $expected = 'e703b4d643762301810690dcb560422eea5ccaebc2cae3c9b87be0af7dd7dc49'
+          $actual = (Get-FileHash source.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Host "Downloaded SHA256=$actual"
+          if ($actual -ne $expected) { throw "Source SHA256 mismatch. Expected $expected, got $actual" }
+          New-Item -ItemType Directory -Path srcroot | Out-Null
+          Expand-Archive -LiteralPath source.zip -DestinationPath srcroot -Force
+
+      - name: Prepare vcpkg static dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $vcpkg = $env:VCPKG_INSTALLATION_ROOT
+          if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
+          if (-not (Test-Path "$vcpkg\vcpkg.exe")) {
+            $vcpkg = "$env:RUNNER_TEMP\vcpkg"
+            git clone --depth 1 https://github.com/microsoft/vcpkg $vcpkg
+            & "$vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+          }
+          "VCPKG_ROOT=$vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & "$vcpkg\vcpkg.exe" install sqlite3:x64-windows-static openssl:x64-windows-static libxml2:x64-windows-static --disable-metrics
+
+      - name: Configure Cliente and MASTER
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $src = (Get-ChildItem "$env:GITHUB_WORKSPACE\srcroot" -Directory | Select-Object -First 1).FullName
+          if (-not $src) { throw 'Extracted source directory not found' }
+          "NEXO_SRC=$src" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          cmake -S $src -B "$src\out\build\windows-cliente" -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -DNEXO_BUILD_APPS=ON -DNEXO_BUILD_TESTS=ON -DNEXO_INSTALLER_PRODUCT=CLIENTE
+          cmake -S $src -B "$src\out\build\windows-master" -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -DNEXO_BUILD_APPS=ON -DNEXO_BUILD_TESTS=ON -DNEXO_INSTALLER_PRODUCT=MASTER
+
+      - name: Build Cliente and MASTER Release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          cmake --build "$env:NEXO_SRC\out\build\windows-cliente" --config Release --parallel 2
+          cmake --build "$env:NEXO_SRC\out\build\windows-master" --config Release --parallel 2
+
+      - name: Run CTest on both products
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          ctest --test-dir "$env:NEXO_SRC\out\build\windows-cliente" -C Release --output-on-failure
+          ctest --test-dir "$env:NEXO_SRC\out\build\windows-master" -C Release --output-on-failure
+
+      - name: Run Windows self-tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          & "$env:NEXO_SRC\out\build\windows-cliente\Release\NEXO_CLIENTE.exe" --nexo-self-test
+          & "$env:NEXO_SRC\out\build\windows-master\Release\NEXO_MASTER.exe" --nexo-self-test
+
+      - name: Stage beta EXEs and hashes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path "$env:GITHUB_WORKSPACE\beta-output" -Force | Out-Null
+          Copy-Item "$env:NEXO_SRC\out\build\windows-cliente\Release\NEXO_CLIENTE.exe" "$env:GITHUB_WORKSPACE\beta-output\NEXO_CLIENTE_R23_P4_BETA_WINDOWS_X64.exe"
+          Copy-Item "$env:NEXO_SRC\out\build\windows-master\Release\NEXO_MASTER.exe" "$env:GITHUB_WORKSPACE\beta-output\NEXO_MASTER_R23_P4_BETA_WINDOWS_X64.exe"
+          $lines = Get-ChildItem "$env:GITHUB_WORKSPACE\beta-output\*.exe" | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
+          $lines | Set-Content "$env:GITHUB_WORKSPACE\beta-output\SHA256SUMS.txt"
+          @(
+            'NEXO R23 Patch 4 BETA - Windows x64',
+            'Uso: teste interno. Nao e release comercial homologada.',
+            'Fonte canonica SHA256: e703b4d643762301810690dcb560422eea5ccaebc2cae3c9b87be0af7dd7dc49',
+            'Build: MSVC Visual Studio 2022, x64-windows-static, Release /MT.',
+            'Gate: CTest + --nexo-self-test executados antes da publicacao do artefato.'
+          ) | Set-Content "$env:GITHUB_WORKSPACE\beta-output\LEIA_PRIMEIRO.txt"
+          Get-ChildItem "$env:GITHUB_WORKSPACE\beta-output" | Format-Table Name,Length
+
+      - name: Upload NEXO beta EXEs
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXO_R23_P4_BETA_WINDOWS_X64
+          path: beta-output/*
+          if-no-files-found: error
+          retention-days: 7
