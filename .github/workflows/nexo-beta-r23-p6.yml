@@ -22,7 +22,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          $url = 'https://sdmntprsoutheastus3.oaiusercontent.com/files/00000000-3870-820c-a6e8-a146c228c678/raw?se=2026-09-16T20%3A22%3A37Z&sp=r&sv=2026-02-06&sr=b&scid=5117e0c9-2264-5c15-8da7-30f442589429&skoid=a6356955-0ca0-4033-9150-c0c162458498&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T19%3A50%3A50Z&ske=2026-09-17T19%3A50%3A50Z&sks=b&skv=2026-02-06&sig=gGvzG%2BwBsedBrUDst8hilgx7D/6ercykIyghVCYxu/M%3D'
+          $url = 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-b498-820e-89e9-d26e5c55536a/raw?se=2026-09-16T20%3A30%3A07Z&sp=r&sv=2026-02-06&sr=b&scid=befc3842-c8d1-52bf-9979-887a489e3314&skoid=a6356955-0ca0-4033-9150-c0c162458498&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T19%3A50%3A52Z&ske=2026-09-17T19%3A50%3A52Z&sks=b&skv=2026-02-06&sig=846nTGakbeYconYPp2uD9StJ293LoHZjZygb8KP8CKs%3D'
           Invoke-WebRequest -Uri $url -OutFile source.zip -MaximumRedirection 10
           $expected = '07167eac4985757d113f4fd5c0fcd65b51e5004d51b51e6c0c99866fc850825e'
           $actual = (Get-FileHash source.zip -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -73,17 +73,42 @@ jobs:
           ctest --test-dir "$env:NEXO_SRC\out\build\windows-cliente" -C Release --output-on-failure
           ctest --test-dir "$env:NEXO_SRC\out\build\windows-master" -C Release --output-on-failure
 
-      - name: Run Windows self-tests
+      - name: Run and validate Windows self-tests
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
           $client = "$env:NEXO_SRC\out\build\windows-cliente\Release\NEXO_CLIENTE.exe"
           $master = "$env:NEXO_SRC\out\build\windows-master\Release\NEXO_MASTER.exe"
-          & $client --nexo-self-test
-          if ($LASTEXITCODE -ne 0) { throw "Cliente self-test failed with $LASTEXITCODE" }
-          & $master --nexo-self-test
-          if ($LASTEXITCODE -ne 0) { throw "MASTER self-test failed with $LASTEXITCODE" }
+          $clientReport = Join-Path $env:LOCALAPPDATA 'NEXO\Cliente\NEXO_CLIENTE_HOMOLOGACAO.json'
+          $masterReport = Join-Path $env:LOCALAPPDATA 'NEXO\Master\NEXO_MASTER_HOMOLOGACAO.json'
+
+          Remove-Item $clientReport,$masterReport -Force -ErrorAction SilentlyContinue
+
+          $clientProcess = Start-Process -FilePath $client -ArgumentList '--nexo-self-test' -Wait -PassThru
+          Write-Host "CLIENTE_SELF_TEST_EXIT=$($clientProcess.ExitCode)"
+          if ($clientProcess.ExitCode -ne 0) { throw "Cliente self-test failed with $($clientProcess.ExitCode)" }
+          if (-not (Test-Path $clientReport)) { throw 'Cliente self-test report was not generated' }
+          $clientJson = Get-Content $clientReport -Raw | ConvertFrom-Json
+          if ($clientJson.overall -ne 'PASS') { throw "Cliente report overall=$($clientJson.overall)" }
+          if ($clientJson.schema_version -ne 14) { throw "Cliente schema_version=$($clientJson.schema_version)" }
+          if ($clientJson.quick_check -ne 'ok') { throw "Cliente quick_check=$($clientJson.quick_check)" }
+          if (-not $clientJson.foreign_keys) { throw 'Cliente foreign_keys disabled' }
+          if ([string]::IsNullOrWhiteSpace([string]$clientJson.install_id)) { throw 'Cliente install_id missing' }
+          if ([string]::IsNullOrWhiteSpace([string]$clientJson.machine_binding)) { throw 'Cliente machine_binding missing' }
+
+          $masterProcess = Start-Process -FilePath $master -ArgumentList '--nexo-self-test' -Wait -PassThru
+          Write-Host "MASTER_SELF_TEST_EXIT=$($masterProcess.ExitCode)"
+          if ($masterProcess.ExitCode -ne 0) { throw "MASTER self-test failed with $($masterProcess.ExitCode)" }
+          if (-not (Test-Path $masterReport)) { throw 'MASTER self-test report was not generated' }
+          $masterJson = Get-Content $masterReport -Raw | ConvertFrom-Json
+          if ($masterJson.overall -ne 'PASS') { throw "MASTER report overall=$($masterJson.overall)" }
+          if ($masterJson.schema_version -ne 14) { throw "MASTER schema_version=$($masterJson.schema_version)" }
+          if ($masterJson.quick_check -ne 'ok') { throw "MASTER quick_check=$($masterJson.quick_check)" }
+          if (-not $masterJson.foreign_keys) { throw 'MASTER foreign_keys disabled' }
+          if ([string]::IsNullOrWhiteSpace([string]$masterJson.install_id)) { throw 'MASTER install_id missing' }
+          if ([string]::IsNullOrWhiteSpace([string]$masterJson.machine_binding)) { throw 'MASTER machine_binding missing' }
+
+          Write-Host 'WINDOWS_SELF_TESTS=PASS'
 
       - name: Stage beta EXEs and evidence
         shell: pwsh
@@ -95,8 +120,8 @@ jobs:
           Get-FileHash beta\*.exe -Algorithm SHA256 | Format-Table -AutoSize | Out-String | Set-Content beta\SHA256.txt
           $clientReport = Join-Path $env:LOCALAPPDATA 'NEXO\Cliente\NEXO_CLIENTE_HOMOLOGACAO.json'
           $masterReport = Join-Path $env:LOCALAPPDATA 'NEXO\Master\NEXO_MASTER_HOMOLOGACAO.json'
-          if (Test-Path $clientReport) { Copy-Item $clientReport beta\NEXO_CLIENTE_HOMOLOGACAO.json }
-          if (Test-Path $masterReport) { Copy-Item $masterReport beta\NEXO_MASTER_HOMOLOGACAO.json }
+          Copy-Item $clientReport beta\NEXO_CLIENTE_HOMOLOGACAO.json
+          Copy-Item $masterReport beta\NEXO_MASTER_HOMOLOGACAO.json
 
       - name: Upload NEXO beta EXEs
         uses: actions/upload-artifact@v4
