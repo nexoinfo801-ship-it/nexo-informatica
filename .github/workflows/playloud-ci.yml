@@ -9,10 +9,10 @@ on:
       - main
 
 jobs:
-  domain-tests:
-    name: Domain tests (.NET 10 / Windows)
+  windows-build-and-tests:
+    name: Build + tests (.NET 10 / Windows)
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -26,11 +26,11 @@ jobs:
       - name: Show SDK
         run: dotnet --info
 
-      - name: Restore
-        run: dotnet restore tests/Playloud.Domain.Tests/Playloud.Domain.Tests.csproj
+      - name: Restore solution
+        run: dotnet restore Playloud.sln
 
-      - name: Run xUnit executable probe
-        run: dotnet run --project tests/Playloud.Domain.Tests/Playloud.Domain.Tests.csproj -c Release --no-restore
+      - name: Build solution
+        run: dotnet build Playloud.sln -c Release --no-restore
 
-      - name: Test through dotnet test
-        run: dotnet test tests/Playloud.Domain.Tests/Playloud.Domain.Tests.csproj -c Release --no-restore
+      - name: Test solution
+        run: dotnet test Playloud.sln -c Release --no-build --no-restore
