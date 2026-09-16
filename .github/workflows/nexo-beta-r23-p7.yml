@@ -1,4 +1,4 @@
-name: NEXO R23 Patch 7 Beta Windows x64
+name: NEXO R23 Patch 7 Fix1 Beta Windows x64
 
 on:
   push:
@@ -19,14 +19,14 @@ jobs:
       - name: Checkout beta branch
         uses: actions/checkout@v4
 
-      - name: Download exact Patch 7 source
+      - name: Download exact Patch 7 Fix1 source
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          $url = 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-c518-81f5-8163-1ce0ed680051/raw?se=2026-09-16T21%3A20%3A10Z&sp=r&sv=2026-02-06&sr=b&scid=0001f683-db5f-5484-ad07-536f7e8965c7&skoid=a6356955-0ca0-4033-9150-c0c162458498&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T19%3A50%3A55Z&ske=2026-09-17T19%3A50%3A55Z&sks=b&skv=2026-02-06&sig=hY/vlfyAFHHDBJb10wTyokvyo6UQUrm9xMqKxQFBYqo%3D'
+          $url = 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-63e8-820e-a253-207d915a7125/raw?se=2026-09-16T21%3A39%3A02Z&sp=r&sv=2026-02-06&sr=b&scid=f26d00ab-fde2-5e93-a36e-35a6b535b1b6&skoid=a6356955-0ca0-4033-9150-c0c162458498&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T19%3A38%3A16Z&ske=2026-09-17T19%3A38%3A16Z&sks=b&skv=2026-02-06&sig=uJX6b3aMeSmTLDC4dgxPeg2HMB30%2BxjA5TbaqfVQCmQ%3D'
           Invoke-WebRequest -Uri $url -OutFile source.zip -MaximumRedirection 10
-          $expected = 'e89c4e6ceb7db0448a03359aaffea4921cc1a7c86ef3bb4f0e4a1efb2514562a'
+          $expected = '220d074a4ce11a8b6c38c8363f42226b687fa9b30782dd03f2f27a30e0681540'
           $actual = (Get-FileHash source.zip -Algorithm SHA256).Hash.ToLowerInvariant()
           Write-Host "Downloaded SHA256=$actual"
           if ($actual -ne $expected) { throw "Source SHA256 mismatch. Expected $expected, got $actual" }
@@ -84,16 +84,12 @@ jobs:
           $clientReport = Join-Path $env:LOCALAPPDATA 'NEXO\Cliente\NEXO_CLIENTE_HOMOLOGACAO.json'
           $masterReport = Join-Path $env:LOCALAPPDATA 'NEXO\Master\NEXO_MASTER_HOMOLOGACAO.json'
           Remove-Item $clientReport,$masterReport -Force -ErrorAction SilentlyContinue
-
           $clientProcess = Start-Process -FilePath $client -ArgumentList '--nexo-self-test' -Wait -PassThru
-          Write-Host "CLIENTE_SELF_TEST_EXIT=$($clientProcess.ExitCode)"
           if ($clientProcess.ExitCode -ne 0) { throw "Cliente self-test failed with $($clientProcess.ExitCode)" }
           if (-not (Test-Path $clientReport)) { throw 'Cliente self-test report was not generated' }
           $clientJson = Get-Content $clientReport -Raw | ConvertFrom-Json
           if ($clientJson.overall -ne 'PASS') { throw "Cliente report overall=$($clientJson.overall)" }
-
           $masterProcess = Start-Process -FilePath $master -ArgumentList '--nexo-self-test' -Wait -PassThru
-          Write-Host "MASTER_SELF_TEST_EXIT=$($masterProcess.ExitCode)"
           if ($masterProcess.ExitCode -ne 0) { throw "MASTER self-test failed with $($masterProcess.ExitCode)" }
           if (-not (Test-Path $masterReport)) { throw 'MASTER self-test report was not generated' }
           $masterJson = Get-Content $masterReport -Raw | ConvertFrom-Json
@@ -105,24 +101,24 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Path beta | Out-Null
-          Copy-Item "$env:NEXO_SRC\out\build\windows-cliente\Release\NEXO_CLIENTE.exe" "beta\NEXO_CLIENTE_R23_P7_BETA_WINDOWS_X64.exe"
-          Copy-Item "$env:NEXO_SRC\out\build\windows-master\Release\NEXO_MASTER.exe" "beta\NEXO_MASTER_R23_P7_BETA_WINDOWS_X64.exe"
+          Copy-Item "$env:NEXO_SRC\out\build\windows-cliente\Release\NEXO_CLIENTE.exe" "beta\NEXO_CLIENTE_R23_P7_FIX1_BETA_WINDOWS_X64.exe"
+          Copy-Item "$env:NEXO_SRC\out\build\windows-master\Release\NEXO_MASTER.exe" "beta\NEXO_MASTER_R23_P7_FIX1_BETA_WINDOWS_X64.exe"
           Get-FileHash beta\*.exe -Algorithm SHA256 | Format-Table -AutoSize | Out-String | Set-Content beta\SHA256.txt
           $clientReport = Join-Path $env:LOCALAPPDATA 'NEXO\Cliente\NEXO_CLIENTE_HOMOLOGACAO.json'
           $masterReport = Join-Path $env:LOCALAPPDATA 'NEXO\Master\NEXO_MASTER_HOMOLOGACAO.json'
           Copy-Item $clientReport beta\NEXO_CLIENTE_HOMOLOGACAO.json
           Copy-Item $masterReport beta\NEXO_MASTER_HOMOLOGACAO.json
           @(
-            'NEXO R23 Patch 7 BETA - Windows x64',
+            'NEXO R23 Patch 7 Fix1 BETA - Windows x64',
             'Inclui Diagnostico & AutoRepair seguro e primeira modernizacao da shell Cliente.',
             'Uso: teste interno. Nao e release comercial homologada.',
-            'Fonte canonica SHA256: e89c4e6ceb7db0448a03359aaffea4921cc1a7c86ef3bb4f0e4a1efb2514562a'
+            'Fonte canonica SHA256: 220d074a4ce11a8b6c38c8363f42226b687fa9b30782dd03f2f27a30e0681540'
           ) | Set-Content beta\LEIA_PRIMEIRO.txt
 
       - name: Upload NEXO beta EXEs
         uses: actions/upload-artifact@v4
         with:
-          name: NEXO_R23_P7_BETA_WINDOWS_X64
+          name: NEXO_R23_P7_FIX1_BETA_WINDOWS_X64
           path: beta/*
           if-no-files-found: error
           retention-days: 7
