@@ -4,6 +4,13 @@ using Playloud.Domain.Sales;
 
 namespace Playloud.Domain.Cash;
 
+public enum CashMovementKind
+{
+    SaleCash = 1,
+    Supply = 2,
+    Withdrawal = 3
+}
+
 public sealed class CashSession
 {
     private readonly List<CashMovement> _movements = [];
@@ -68,11 +75,44 @@ public sealed class CashSession
 
             _movements.Add(new CashMovement(
                 EntityId<CashMovement>.New(),
+                CashMovementKind.SaleCash,
                 sale.Id,
-                payment.Amount));
+                payment.Amount,
+                "Venda"));
         }
 
         _registeredSales.Add(sale.Id);
+    }
+
+    public void RegisterSupply(decimal amount, string reason)
+    {
+        EnsureOpen();
+        ValidateManualMovement(amount, reason);
+
+        _movements.Add(new CashMovement(
+            EntityId<CashMovement>.New(),
+            CashMovementKind.Supply,
+            null,
+            amount,
+            reason.Trim()));
+    }
+
+    public void RegisterWithdrawal(decimal amount, string reason)
+    {
+        EnsureOpen();
+        ValidateManualMovement(amount, reason);
+
+        if (amount > ExpectedCashBalance)
+        {
+            throw new InvalidOperationException("Withdrawal cannot make expected cash negative.");
+        }
+
+        _movements.Add(new CashMovement(
+            EntityId<CashMovement>.New(),
+            CashMovementKind.Withdrawal,
+            null,
+            -amount,
+            reason.Trim()));
     }
 
     public CashClosing Close(decimal actualCash)
@@ -96,12 +136,27 @@ public sealed class CashSession
             throw new InvalidOperationException("Cash session is closed.");
         }
     }
+
+    private static void ValidateManualMovement(decimal amount, string reason)
+    {
+        if (amount <= 0m)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount), "Cash movement amount must be positive.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("Cash movement reason is required.", nameof(reason));
+        }
+    }
 }
 
 public sealed record CashMovement(
     EntityId<CashMovement> Id,
-    EntityId<Sale> SaleId,
-    decimal Amount);
+    CashMovementKind Kind,
+    EntityId<Sale>? SaleId,
+    decimal Amount,
+    string Reason);
 
 public sealed record CashClosing(
     decimal ExpectedCash,
