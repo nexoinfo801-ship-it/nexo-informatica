@@ -29,5 +29,8 @@ jobs:
       - name: Restore
         run: dotnet restore tests/Playloud.Domain.Tests/Playloud.Domain.Tests.csproj
 
-      - name: Test
-        run: dotnet test tests/Playloud.Domain.Tests/Playloud.Domain.Tests.csproj -c Release --no-restore --logger "trx;LogFileName=domain-tests.trx"
+      - name: Run xUnit executable probe
+        run: dotnet run --project tests/Playloud.Domain.Tests/Playloud.Domain.Tests.csproj -c Release --no-restore
+
+      - name: Test through dotnet test
+        run: dotnet test tests/Playloud.Domain.Tests/Playloud.Domain.Tests.csproj -c Release --no-restore
