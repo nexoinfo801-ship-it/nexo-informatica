@@ -33,6 +33,7 @@ public sealed class ApplicationPortAdapterTests : IAsyncLifetime
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var store = new SqliteCommerceStore(_databasePath);
         await store.InitializeAsync(cancellationToken);
+        var adapter = new SqliteCommerceAdapter(store);
 
         var product = Product.Create("Café", 12.50m, 6m);
         await store.SaveProductAsync(product, openingStock: 10m, cancellationToken);
@@ -40,8 +41,8 @@ public sealed class ApplicationPortAdapterTests : IAsyncLifetime
         var cashSession = CashSession.Open(new DateOnly(2026, 9, 16), openingBalance: 100m);
         await store.SaveCashSessionAsync(cashSession, cancellationToken);
 
-        IProductSnapshotReader reader = store;
-        ISaleCommitter committer = store;
+        IProductSnapshotReader reader = adapter;
+        ISaleCommitter committer = adapter;
         var useCase = new FinalizarVenda(reader, committer);
 
         var result = await useCase.ExecuteAsync(
@@ -64,11 +65,12 @@ public sealed class ApplicationPortAdapterTests : IAsyncLifetime
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var store = new SqliteCommerceStore(_databasePath);
         await store.InitializeAsync(cancellationToken);
+        var adapter = new SqliteCommerceAdapter(store);
 
         var product = Product.Create("Produto", 30m, 12m);
         await store.SaveProductAsync(product, openingStock: 7m, cancellationToken);
 
-        IProductSnapshotReader reader = store;
+        IProductSnapshotReader reader = adapter;
         var snapshot = await reader.ReadAsync(product.Id, cancellationToken);
 
         Assert.NotNull(snapshot);
