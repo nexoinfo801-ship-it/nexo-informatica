@@ -23,10 +23,11 @@ public sealed class SqliteCommerceStoreTests : IAsyncLifetime
     [Fact]
     public async Task Database_initialization_enables_foreign_keys_and_wal()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         await using var store = new SqliteCommerceStore(_databasePath);
 
-        await store.InitializeAsync();
-        var health = await store.GetHealthAsync();
+        await store.InitializeAsync(cancellationToken);
+        var health = await store.GetHealthAsync(cancellationToken);
 
         Assert.True(health.ForeignKeysEnabled);
         Assert.Equal("wal", health.JournalMode.ToLowerInvariant());
@@ -35,57 +36,61 @@ public sealed class SqliteCommerceStoreTests : IAsyncLifetime
     [Fact]
     public async Task Product_roundtrip_preserves_identity_and_values()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         await using var store = new SqliteCommerceStore(_databasePath);
-        await store.InitializeAsync();
+        await store.InitializeAsync(cancellationToken);
 
         var product = Product.Create("Café Especial", 18.90m, 9.40m);
-        await store.SaveProductAsync(product, openingStock: 12m);
+        await store.SaveProductAsync(product, openingStock: 12m, cancellationToken);
 
-        var loaded = await store.GetProductAsync(product.Id);
+        var loaded = await store.GetProductAsync(product.Id, cancellationToken);
 
         Assert.NotNull(loaded);
         Assert.Equal(product.Id, loaded.Id);
         Assert.Equal(product.Name, loaded.Name);
         Assert.Equal(product.UnitPrice, loaded.UnitPrice);
         Assert.Equal(product.UnitCost, loaded.UnitCost);
-        Assert.Equal(12m, await store.GetStockAsync(product.Id));
+        Assert.Equal(12m, await store.GetStockAsync(product.Id, cancellationToken));
     }
 
     [Fact]
     public async Task Sale_commit_is_atomic_and_decrements_current_stock()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         await using var store = new SqliteCommerceStore(_databasePath);
-        await store.InitializeAsync();
+        await store.InitializeAsync(cancellationToken);
 
         var product = Product.Create("Marmita", 25m, 14m);
-        await store.SaveProductAsync(product, openingStock: 5m);
+        await store.SaveProductAsync(product, openingStock: 5m, cancellationToken);
 
         var sale = Sale.Start(new DateOnly(2026, 9, 16));
         sale.AddLine(product, quantity: 2m, availableStock: 5m);
 
-        await store.CommitSaleAsync(sale);
+        await store.CommitSaleAsync(sale, cancellationToken);
 
-        Assert.Equal(3m, await store.GetStockAsync(product.Id));
-        Assert.Equal(1, await store.CountSalesAsync());
-        Assert.Equal(1, await store.CountSaleLinesAsync(sale.Id));
+        Assert.Equal(3m, await store.GetStockAsync(product.Id, cancellationToken));
+        Assert.Equal(1, await store.CountSalesAsync(cancellationToken));
+        Assert.Equal(1, await store.CountSaleLinesAsync(sale.Id, cancellationToken));
     }
 
     [Fact]
     public async Task Stock_race_rejects_sale_and_rolls_back_everything()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         await using var store = new SqliteCommerceStore(_databasePath);
-        await store.InitializeAsync();
+        await store.InitializeAsync(cancellationToken);
 
         var product = Product.Create("Refrigerante", 8m, 3.50m);
-        await store.SaveProductAsync(product, openingStock: 1m);
+        await store.SaveProductAsync(product, openingStock: 1m, cancellationToken);
 
         var sale = Sale.Start(new DateOnly(2026, 9, 16));
         sale.AddLine(product, quantity: 2m, availableStock: 10m);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => store.CommitSaleAsync(sale));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.CommitSaleAsync(sale, cancellationToken));
 
-        Assert.Equal(1m, await store.GetStockAsync(product.Id));
-        Assert.Equal(0, await store.CountSalesAsync());
-        Assert.Equal(0, await store.CountSaleLinesAsync(sale.Id));
+        Assert.Equal(1m, await store.GetStockAsync(product.Id, cancellationToken));
+        Assert.Equal(0, await store.CountSalesAsync(cancellationToken));
+        Assert.Equal(0, await store.CountSaleLinesAsync(sale.Id, cancellationToken));
     }
 }
