@@ -1,11 +1,13 @@
 using Playloud.Domain.Catalog;
 using Playloud.Domain.Common;
+using Playloud.Domain.Payments;
 
 namespace Playloud.Domain.Sales;
 
 public sealed class Sale
 {
     private readonly List<SaleLine> _lines = [];
+    private readonly List<Payment> _payments = [];
 
     private Sale(DateOnly businessDate)
     {
@@ -19,10 +21,21 @@ public sealed class Sale
 
     public IReadOnlyList<SaleLine> Lines => _lines;
 
+    public IReadOnlyList<Payment> Payments => _payments;
+
+    public decimal GrossTotal => _lines.Sum(static line => line.GrossTotal);
+
+    public bool IsCompleted { get; private set; }
+
     public static Sale Start(DateOnly businessDate) => new(businessDate);
 
     public void AddLine(Product product, decimal quantity, decimal availableStock)
     {
+        if (IsCompleted)
+        {
+            throw new InvalidOperationException("A completed sale cannot be changed.");
+        }
+
         ArgumentNullException.ThrowIfNull(product);
 
         if (quantity <= 0m)
@@ -47,6 +60,32 @@ public sealed class Sale
             quantity,
             product.UnitPrice,
             product.UnitCost));
+    }
+
+    public void Complete(IEnumerable<Payment> payments)
+    {
+        ArgumentNullException.ThrowIfNull(payments);
+
+        if (IsCompleted)
+        {
+            throw new InvalidOperationException("Sale is already completed.");
+        }
+
+        if (_lines.Count == 0)
+        {
+            throw new InvalidOperationException("A sale must contain at least one line.");
+        }
+
+        var paymentList = payments.ToList();
+        var paidTotal = paymentList.Sum(static payment => payment.Amount);
+
+        if (paidTotal != GrossTotal)
+        {
+            throw new InvalidOperationException("Payment total must match sale total.");
+        }
+
+        _payments.AddRange(paymentList);
+        IsCompleted = true;
     }
 }
 
