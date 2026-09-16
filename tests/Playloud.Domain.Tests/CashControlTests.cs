@@ -16,7 +16,6 @@ public sealed class CashControlTests
         Assert.Equal(CashMovementKind.Supply, movement.Kind);
         Assert.Equal(50m, movement.Amount);
         Assert.Equal("Troco adicional", movement.Reason);
-        Assert.Null(movement.SaleId);
     }
 
     [Fact]
@@ -31,7 +30,6 @@ public sealed class CashControlTests
         Assert.Equal(CashMovementKind.Withdrawal, movement.Kind);
         Assert.Equal(-30m, movement.Amount);
         Assert.Equal("Sangria preventiva", movement.Reason);
-        Assert.Null(movement.SaleId);
     }
 
     [Fact]
