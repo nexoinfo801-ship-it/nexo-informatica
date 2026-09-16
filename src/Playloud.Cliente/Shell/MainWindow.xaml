@@ -1,0 +1,18 @@
+<Window x:Class="Playloud.Cliente.Shell.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Playloud Cliente"
+        Width="1280"
+        Height="800"
+        MinWidth="1024"
+        MinHeight="640"
+        WindowStartupLocation="CenterScreen">
+    <Grid Background="#070B12">
+        <TextBlock Text="Playloud Cliente"
+                   Foreground="#F8FAFC"
+                   FontSize="32"
+                   FontWeight="SemiBold"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center" />
+    </Grid>
+</Window>

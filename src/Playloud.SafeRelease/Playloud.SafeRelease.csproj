@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Playloud.Domain/Playloud.Domain.csproj" />
+    <ProjectReference Include="../Playloud.Application/Playloud.Application.csproj" />
+    <ProjectReference Include="../Playloud.Security/Playloud.Security.csproj" />
+    <ProjectReference Include="../Playloud.Diagnostics/Playloud.Diagnostics.csproj" />
+  </ItemGroup>
+</Project>

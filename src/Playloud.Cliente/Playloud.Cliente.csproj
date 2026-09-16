@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Playloud.Cliente</RootNamespace>
+    <AssemblyName>Playloud.Cliente</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Playloud.Application/Playloud.Application.csproj" />
+    <ProjectReference Include="../Playloud.Persistence/Playloud.Persistence.csproj" />
+    <ProjectReference Include="../Playloud.Security/Playloud.Security.csproj" />
+    <ProjectReference Include="../Playloud.Diagnostics/Playloud.Diagnostics.csproj" />
+    <ProjectReference Include="../Playloud.SafeRelease/Playloud.SafeRelease.csproj" />
+  </ItemGroup>
+</Project>
