@@ -22,9 +22,9 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          $url = 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-b36c-820e-9bca-1bce21e5aa46/raw?se=2026-09-16T20%3A10%3A21Z&sp=r&sv=2026-02-06&sr=b&scid=4cce3935-768f-5600-b9d0-59383ec6de4e&skoid=a6356955-0ca0-4033-9150-c0c162458498&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T19%3A50%3A48Z&ske=2026-09-17T19%3A50%3A48Z&sks=b&skv=2026-02-06&sig=cGEVVgfTVa6%2BaoQjylUMlM69ubTsP8CeUamB0mkTasc%3D'
+          $url = 'https://sdmntprsoutheastus3.oaiusercontent.com/files/00000000-3870-820c-a6e8-a146c228c678/raw?se=2026-09-16T20%3A22%3A37Z&sp=r&sv=2026-02-06&sr=b&scid=5117e0c9-2264-5c15-8da7-30f442589429&skoid=a6356955-0ca0-4033-9150-c0c162458498&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T19%3A50%3A50Z&ske=2026-09-17T19%3A50%3A50Z&sks=b&skv=2026-02-06&sig=gGvzG%2BwBsedBrUDst8hilgx7D/6ercykIyghVCYxu/M%3D'
           Invoke-WebRequest -Uri $url -OutFile source.zip -MaximumRedirection 10
-          $expected = 'ad8180bf67a4f50ff4e9c21bd9b66818948c8b60475e6c2abbe4a5c9e7122684'
+          $expected = '07167eac4985757d113f4fd5c0fcd65b51e5004d51b51e6c0c99866fc850825e'
           $actual = (Get-FileHash source.zip -Algorithm SHA256).Hash.ToLowerInvariant()
           Write-Host "Downloaded SHA256=$actual"
           if ($actual -ne $expected) { throw "Source SHA256 mismatch. Expected $expected, got $actual" }
