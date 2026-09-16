@@ -22,15 +22,24 @@ public sealed class Product
 
     public static Product Create(string name, decimal unitPrice, decimal unitCost)
     {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException("Product name is required.", nameof(name));
-        }
-
+        ValidateName(name);
         ValidateMoney(unitPrice, nameof(unitPrice));
         ValidateMoney(unitCost, nameof(unitCost));
 
         return new Product(EntityId<Product>.New(), name.Trim(), unitPrice, unitCost);
+    }
+
+    public static Product Restore(
+        EntityId<Product> id,
+        string name,
+        decimal unitPrice,
+        decimal unitCost)
+    {
+        ValidateName(name);
+        ValidateMoney(unitPrice, nameof(unitPrice));
+        ValidateMoney(unitCost, nameof(unitCost));
+
+        return new Product(id, name.Trim(), unitPrice, unitCost);
     }
 
     public void Reprice(decimal unitPrice, decimal unitCost)
@@ -40,6 +49,14 @@ public sealed class Product
 
         UnitPrice = unitPrice;
         UnitCost = unitCost;
+    }
+
+    private static void ValidateName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Product name is required.", nameof(name));
+        }
     }
 
     private static void ValidateMoney(decimal value, string parameterName)
