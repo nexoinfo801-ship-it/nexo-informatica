@@ -23,7 +23,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $url = 'https://1drv.ms/u/c/882ae890c7b14eaa/IQAL8QEHr1mAT41FcL4x1bEiAcSPrulLaDWbadhhOKf2zdU?download=1'
+          $url = 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-d2f4-820e-b05b-d9597837d43b/raw?se=2026-09-16T18%3A37%3A34Z&sp=r&sv=2026-02-06&sr=b&scid=dfaf0bb9-c927-5f63-8940-a900cd80a829&skoid=a6356955-0ca0-4033-9150-c0c162458498&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T11%3A28%3A55Z&ske=2026-09-17T11%3A28%3A55Z&sks=b&skv=2026-02-06&sig=sBHYsGpN2ZtpIcBZfsorSYzmIj7hc/8B7Hq0A2hplCo%3D'
           Invoke-WebRequest -Uri $url -OutFile source.zip -MaximumRedirection 10
           $expected = '56c76beede49ed5a7b76b38d030552096d287c8937a4c833102b3f288fffe99e'
           $actual = (Get-FileHash source.zip -Algorithm SHA256).Hash.ToLowerInvariant()
