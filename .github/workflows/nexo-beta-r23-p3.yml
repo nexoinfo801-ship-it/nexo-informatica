@@ -1,0 +1,106 @@
+name: NEXO R23 Patch 3 Beta Windows x64
+
+on:
+  push:
+    branches:
+      - nexo-beta-r23-p3
+    paths:
+      - .github/workflows/nexo-beta-r23-p3.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-beta:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - name: Checkout beta branch
+        uses: actions/checkout@v4
+
+      - name: Download canonical R23 Patch 3 source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://1drv.ms/u/c/882ae890c7b14eaa/IQAL8QEHr1mAT41FcL4x1bEiAcSPrulLaDWbadhhOKf2zdU?download=1'
+          Invoke-WebRequest -Uri $url -OutFile source.zip -MaximumRedirection 10
+          $expected = '56c76beede49ed5a7b76b38d030552096d287c8937a4c833102b3f288fffe99e'
+          $actual = (Get-FileHash source.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Host "Downloaded SHA256=$actual"
+          if ($actual -ne $expected) { throw "Source SHA256 mismatch. Expected $expected, got $actual" }
+          New-Item -ItemType Directory -Path srcroot | Out-Null
+          Expand-Archive -LiteralPath source.zip -DestinationPath srcroot -Force
+
+      - name: Prepare vcpkg static dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vcpkg = $env:VCPKG_INSTALLATION_ROOT
+          if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
+          if (-not (Test-Path "$vcpkg\vcpkg.exe")) {
+            $vcpkg = "$env:RUNNER_TEMP\vcpkg"
+            git clone --depth 1 https://github.com/microsoft/vcpkg $vcpkg
+            & "$vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+          }
+          "VCPKG_ROOT=$vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & "$vcpkg\vcpkg.exe" install sqlite3:x64-windows-static openssl:x64-windows-static libxml2:x64-windows-static --disable-metrics
+
+      - name: Configure Cliente and MASTER
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $src = (Get-ChildItem "$env:GITHUB_WORKSPACE\srcroot" -Directory | Select-Object -First 1).FullName
+          if (-not $src) { throw 'Extracted source directory not found' }
+          "NEXO_SRC=$src" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          cmake -S $src -B "$src\out\build\windows-cliente" -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -DNEXO_BUILD_APPS=ON -DNEXO_BUILD_TESTS=ON -DNEXO_INSTALLER_PRODUCT=CLIENTE
+          cmake -S $src -B "$src\out\build\windows-master" -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -DNEXO_BUILD_APPS=ON -DNEXO_BUILD_TESTS=ON -DNEXO_INSTALLER_PRODUCT=MASTER
+
+      - name: Build Cliente and MASTER Release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cmake --build "$env:NEXO_SRC\out\build\windows-cliente" --config Release --parallel 2
+          cmake --build "$env:NEXO_SRC\out\build\windows-master" --config Release --parallel 2
+
+      - name: Run CTest on both products
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ctest --test-dir "$env:NEXO_SRC\out\build\windows-cliente" -C Release --output-on-failure
+          ctest --test-dir "$env:NEXO_SRC\out\build\windows-master" -C Release --output-on-failure
+
+      - name: Run Windows self-tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & "$env:NEXO_SRC\out\build\windows-cliente\Release\NEXO_CLIENTE.exe" --nexo-self-test
+          if ($LASTEXITCODE -ne 0) { throw "Cliente self-test failed with exit code $LASTEXITCODE" }
+          & "$env:NEXO_SRC\out\build\windows-master\Release\NEXO_MASTER.exe" --nexo-self-test
+          if ($LASTEXITCODE -ne 0) { throw "MASTER self-test failed with exit code $LASTEXITCODE" }
+
+      - name: Stage beta EXEs and hashes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path "$env:GITHUB_WORKSPACE\beta-output" -Force | Out-Null
+          Copy-Item "$env:NEXO_SRC\out\build\windows-cliente\Release\NEXO_CLIENTE.exe" "$env:GITHUB_WORKSPACE\beta-output\NEXO_CLIENTE_R23_P3_BETA_WINDOWS_X64.exe"
+          Copy-Item "$env:NEXO_SRC\out\build\windows-master\Release\NEXO_MASTER.exe" "$env:GITHUB_WORKSPACE\beta-output\NEXO_MASTER_R23_P3_BETA_WINDOWS_X64.exe"
+          $lines = Get-ChildItem "$env:GITHUB_WORKSPACE\beta-output\*.exe" | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
+          $lines | Set-Content "$env:GITHUB_WORKSPACE\beta-output\SHA256SUMS.txt"
+          @(
+            'NEXO R23 Patch 3 BETA - Windows x64',
+            'Uso: teste interno. Nao e release comercial homologada.',
+            'Fonte canonica SHA256: 56c76beede49ed5a7b76b38d030552096d287c8937a4c833102b3f288fffe99e',
+            'Build: MSVC Visual Studio 2022, x64-windows-static, Release /MT.',
+            'Gate: CTest + --nexo-self-test executados antes da publicacao do artefato.'
+          ) | Set-Content "$env:GITHUB_WORKSPACE\beta-output\LEIA_PRIMEIRO.txt"
+          Get-ChildItem "$env:GITHUB_WORKSPACE\beta-output" | Format-Table Name,Length
+
+      - name: Upload NEXO beta EXEs
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXO_R23_P3_BETA_WINDOWS_X64
+          path: beta-output/*
+          if-no-files-found: error
+          retention-days: 7
