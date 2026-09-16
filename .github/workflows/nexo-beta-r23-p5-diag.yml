@@ -1,0 +1,72 @@
+name: NEXO R23 Patch 5 Readiness Diagnostic
+
+on:
+  push:
+    branches:
+      - nexo-beta-r23-p5-diag
+    paths:
+      - .github/workflows/nexo-beta-r23-p5-diag.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness-diagnostic:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v4
+
+      - name: Download exact Patch 5 diagnostic source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $url = 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-d384-820e-8bb2-bcf62e9963bc/raw?se=2026-09-16T19%3A40%3A30Z&sp=r&sv=2026-02-06&sr=b&scid=cf392cb9-84cd-53b9-884a-0d3e1c1f4d2d&skoid=a6356955-0ca0-4033-9150-c0c162458498&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-16T07%3A12%3A57Z&ske=2026-09-17T07%3A12%3A57Z&sks=b&skv=2026-02-06&sig=SurLzkLRqb1R7evjj%2BpNqS1o27Ne7Z/L5nPgx8R9rhw%3D'
+          Invoke-WebRequest -Uri $url -OutFile source.zip -MaximumRedirection 10
+          $expected = '2fa7c72bdae79926dc5f28135f9a1cc5bb751b3d14374f2a1dd19dbcd3ccb996'
+          $actual = (Get-FileHash source.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Host "Downloaded SHA256=$actual"
+          if ($actual -ne $expected) { throw "Source SHA256 mismatch. Expected $expected, got $actual" }
+          New-Item -ItemType Directory -Path srcroot | Out-Null
+          Expand-Archive -LiteralPath source.zip -DestinationPath srcroot -Force
+          $src = (Get-ChildItem "$env:GITHUB_WORKSPACE\srcroot" -Directory | Select-Object -First 1).FullName
+          if (-not $src) { throw 'Extracted source directory not found' }
+          "NEXO_SRC=$src" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Prepare vcpkg static dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $vcpkg = $env:VCPKG_INSTALLATION_ROOT
+          if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
+          "VCPKG_ROOT=$vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & "$vcpkg\vcpkg.exe" install sqlite3:x64-windows-static openssl:x64-windows-static libxml2:x64-windows-static --disable-metrics
+
+      - name: Configure diagnostic build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          cmake -S $env:NEXO_SRC -B "$env:NEXO_SRC\out\build\windows-diag" -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -DNEXO_BUILD_APPS=ON -DNEXO_BUILD_TESTS=ON -DNEXO_INSTALLER_PRODUCT=CLIENTE
+
+      - name: Build readiness test only
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          cmake --build "$env:NEXO_SRC\out\build\windows-diag" --config Release --target nexo_homologation_readiness_tests --parallel 2
+
+      - name: Run readiness test directly
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $exe = "$env:NEXO_SRC\out\build\windows-diag\Release\nexo_homologation_readiness_tests.exe"
+          & $exe 2>&1 | Tee-Object -FilePath "$env:GITHUB_WORKSPACE\readiness-output.txt"
+          $code = $LASTEXITCODE
+          Write-Host "READINESS_EXIT_CODE=$code"
+          Get-Content "$env:GITHUB_WORKSPACE\readiness-output.txt" -ErrorAction SilentlyContinue
+          if ($code -ne 0) { exit $code }
