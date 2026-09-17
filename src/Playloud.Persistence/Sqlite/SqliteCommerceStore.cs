@@ -16,6 +16,12 @@ public sealed record StoredProduct(
     decimal UnitPrice,
     decimal UnitCost);
 
+public sealed record StoredProductSearchResult(
+    EntityId<Product> Id,
+    string Name,
+    decimal UnitPrice,
+    decimal AvailableStock);
+
 public sealed class SqliteCommerceStore : IAsyncDisposable
 {
     private readonly string _databasePath;
@@ -489,6 +495,59 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
             FromStorageDecimal(reader.GetString(3)));
     }
 
+    public async Task<IReadOnlyList<StoredProductSearchResult>> SearchProductsAsync(
+        string query,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
+
+        if (limit is < 1 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(limit),
+                "Search result limit must be between 1 and 100.");
+        }
+
+        var escapedQuery = EscapeLikePattern(query.Trim());
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT p.id, p.name, p.unit_price, s.quantity
+            FROM products AS p
+            INNER JOIN stock AS s ON s.product_id = p.id
+            WHERE p.name LIKE $contains ESCAPE '\' COLLATE NOCASE
+            ORDER BY
+                CASE
+                    WHEN p.name LIKE $startsWith ESCAPE '\' COLLATE NOCASE THEN 0
+                    ELSE 1
+                END,
+                p.name COLLATE NOCASE,
+                p.id
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$contains", $"%{escapedQuery}%");
+        command.Parameters.AddWithValue("$startsWith", $"{escapedQuery}%");
+        command.Parameters.AddWithValue("$limit", limit);
+
+        var results = new List<StoredProductSearchResult>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            results.Add(new StoredProductSearchResult(
+                new EntityId<Product>(Guid.Parse(reader.GetString(0))),
+                reader.GetString(1),
+                FromStorageDecimal(reader.GetString(2)),
+                FromStorageDecimal(reader.GetString(3))));
+        }
+
+        return results;
+    }
+
     public async Task<decimal> GetStockAsync(
         EntityId<Product> productId,
         CancellationToken cancellationToken = default)
@@ -660,6 +719,12 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    private static string EscapeLikePattern(string value) =>
+        value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("%", "\\%", StringComparison.Ordinal)
+            .Replace("_", "\\_", StringComparison.Ordinal);
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
