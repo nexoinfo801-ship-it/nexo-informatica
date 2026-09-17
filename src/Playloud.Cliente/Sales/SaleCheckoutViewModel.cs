@@ -17,6 +17,8 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     private readonly ISearchProducts _searchProducts;
     private readonly SaleCart _cart;
     private readonly ICreateProduct _createProduct;
+    private readonly UpdateProduct _updateProduct;
+    private readonly AdjustProductStock _adjustProductStock;
     private bool _isBusy;
     private string _statusMessage = "Pronto para vender.";
     private string _searchText = string.Empty;
@@ -24,6 +26,13 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     private decimal _newProductUnitPrice;
     private decimal _newProductUnitCost;
     private decimal _newProductOpeningStock;
+    private EntityId<Product>? _managedProductId;
+    private string _managedProductName = string.Empty;
+    private decimal _managedProductUnitPrice;
+    private decimal _managedProductUnitCost;
+    private decimal _managedAvailableStock;
+    private decimal _managedStockDelta;
+    private string _managedStockReason = string.Empty;
     private EntityId<Sale>? _lastSaleId;
     private decimal? _lastTotal;
 
@@ -45,14 +54,43 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
         ISearchProducts searchProducts,
         SaleCart cart,
         ICreateProduct createProduct)
+        : this(
+            finalizarVenda,
+            searchProducts,
+            cart,
+            createProduct,
+            new UpdateProduct(new EmptyProductCatalogManager()),
+            new AdjustProductStock(new EmptyProductStockAdjuster()))
+    {
+    }
+
+    public SaleCheckoutViewModel(
+        IFinalizarVenda finalizarVenda,
+        ISearchProducts searchProducts,
+        SaleCart cart,
+        ICreateProduct createProduct,
+        UpdateProduct updateProduct,
+        AdjustProductStock adjustProductStock)
     {
         _finalizarVenda = finalizarVenda ?? throw new ArgumentNullException(nameof(finalizarVenda));
         _searchProducts = searchProducts ?? throw new ArgumentNullException(nameof(searchProducts));
         _cart = cart ?? throw new ArgumentNullException(nameof(cart));
         _createProduct = createProduct ?? throw new ArgumentNullException(nameof(createProduct));
+        _updateProduct = updateProduct ?? throw new ArgumentNullException(nameof(updateProduct));
+        _adjustProductStock =
+            adjustProductStock ?? throw new ArgumentNullException(nameof(adjustProductStock));
 
         SearchCommand = new AsyncRelayCommand(() => SearchAsync());
         CreateProductCommand = new AsyncRelayCommand(() => CreateProductAsync());
+        UpdateProductCommand = new AsyncRelayCommand(() => UpdateManagedProductAsync());
+        AdjustStockCommand = new AsyncRelayCommand(() => AdjustManagedStockAsync());
+        SelectProductCommand = new RelayCommand(parameter =>
+        {
+            if (parameter is ProductSearchResult product)
+            {
+                SelectProduct(product);
+            }
+        });
         AddProductCommand = new RelayCommand(parameter =>
         {
             if (parameter is ProductSearchResult product)
@@ -92,6 +130,12 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     public ICommand SearchCommand { get; }
 
     public ICommand CreateProductCommand { get; }
+
+    public ICommand UpdateProductCommand { get; }
+
+    public ICommand AdjustStockCommand { get; }
+
+    public ICommand SelectProductCommand { get; }
 
     public ICommand AddProductCommand { get; }
 
@@ -141,6 +185,44 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     {
         get => _newProductOpeningStock;
         set => SetField(ref _newProductOpeningStock, value);
+    }
+
+    public bool HasManagedProduct => _managedProductId is not null;
+
+    public string ManagedProductName
+    {
+        get => _managedProductName;
+        set => SetField(ref _managedProductName, value ?? string.Empty);
+    }
+
+    public decimal ManagedProductUnitPrice
+    {
+        get => _managedProductUnitPrice;
+        set => SetField(ref _managedProductUnitPrice, value);
+    }
+
+    public decimal ManagedProductUnitCost
+    {
+        get => _managedProductUnitCost;
+        set => SetField(ref _managedProductUnitCost, value);
+    }
+
+    public decimal ManagedAvailableStock
+    {
+        get => _managedAvailableStock;
+        private set => SetField(ref _managedAvailableStock, value);
+    }
+
+    public decimal ManagedStockDelta
+    {
+        get => _managedStockDelta;
+        set => SetField(ref _managedStockDelta, value);
+    }
+
+    public string ManagedStockReason
+    {
+        get => _managedStockReason;
+        set => SetField(ref _managedStockReason, value ?? string.Empty);
     }
 
     public decimal CartSubtotal => _cart.Subtotal;
@@ -239,6 +321,123 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
         {
             StatusMessage = "Ocorreu uma falha inesperada durante o cadastro.";
             throw;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public void SelectProduct(ProductSearchResult product)
+    {
+        ArgumentNullException.ThrowIfNull(product);
+
+        _managedProductId = product.Id;
+        ManagedProductName = product.Name;
+        ManagedProductUnitPrice = product.UnitPrice;
+        ManagedProductUnitCost = product.UnitCost;
+        ManagedAvailableStock = product.AvailableStock;
+        ManagedStockDelta = 0m;
+        ManagedStockReason = string.Empty;
+        OnPropertyChanged(nameof(HasManagedProduct));
+        StatusMessage = "Produto selecionado para gerenciamento.";
+    }
+
+    public async Task<bool> UpdateManagedProductAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_managedProductId is not EntityId<Product> productId)
+        {
+            StatusMessage = "Selecione um produto para editar.";
+            return false;
+        }
+
+        IsBusy = true;
+        StatusMessage = "Atualizando produto...";
+
+        try
+        {
+            var result = await _updateProduct.ExecuteAsync(
+                new UpdateProductCommand(
+                    productId,
+                    ManagedProductName,
+                    ManagedProductUnitPrice,
+                    ManagedProductUnitCost),
+                cancellationToken);
+
+            SearchText = result.Name;
+            await SearchAsync(cancellationToken);
+            var refreshed = SearchResults.FirstOrDefault(product => product.Id == productId);
+            if (refreshed is not null)
+            {
+                SelectProduct(refreshed);
+            }
+
+            StatusMessage = "Produto atualizado com sucesso.";
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            StatusMessage = "Já existe outro produto com este nome.";
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            StatusMessage = "Revise nome, preço e custo do produto.";
+            return false;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task<bool> AdjustManagedStockAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_managedProductId is not EntityId<Product> productId)
+        {
+            StatusMessage = "Selecione um produto para ajustar o estoque.";
+            return false;
+        }
+
+        IsBusy = true;
+        StatusMessage = "Ajustando estoque...";
+
+        try
+        {
+            var result = await _adjustProductStock.ExecuteAsync(
+                new AdjustProductStockCommand(
+                    productId,
+                    ManagedStockDelta,
+                    ManagedStockReason),
+                cancellationToken);
+
+            ManagedAvailableStock = result.CurrentStock;
+            ManagedStockDelta = 0m;
+            ManagedStockReason = string.Empty;
+            SearchText = ManagedProductName;
+            await SearchAsync(cancellationToken);
+            var refreshed = SearchResults.FirstOrDefault(product => product.Id == productId);
+            if (refreshed is not null)
+            {
+                SelectProduct(refreshed);
+            }
+
+            ManagedStockDelta = 0m;
+            ManagedStockReason = string.Empty;
+            StatusMessage = "Estoque ajustado com sucesso.";
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            StatusMessage = "O ajuste deixaria o estoque negativo.";
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            StatusMessage = "Informe uma quantidade diferente de zero e o motivo.";
+            return false;
         }
         finally
         {
@@ -369,6 +568,24 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
 
     private void OnPropertyChanged(string? propertyName) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    private sealed class EmptyProductCatalogManager : IProductCatalogManager
+    {
+        public Task UpdateAsync(
+            Product product,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Product management is not configured.");
+    }
+
+    private sealed class EmptyProductStockAdjuster : IProductStockAdjuster
+    {
+        public Task<decimal> AdjustAsync(
+            EntityId<Product> productId,
+            decimal quantityDelta,
+            string reason,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Stock adjustment is not configured.");
+    }
 
     private sealed class EmptyCreateProduct : ICreateProduct
     {
