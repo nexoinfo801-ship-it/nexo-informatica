@@ -1,21 +1,45 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Playloud.Application.Sales;
 using Playloud.Domain.Common;
 using Playloud.Domain.Sales;
 
 namespace Playloud.Cliente.Sales;
 
-public sealed class SaleCheckoutViewModel(IFinalizarVenda finalizarVenda)
+public sealed class SaleCheckoutViewModel(IFinalizarVenda finalizarVenda) : INotifyPropertyChanged
 {
     private readonly IFinalizarVenda _finalizarVenda =
         finalizarVenda ?? throw new ArgumentNullException(nameof(finalizarVenda));
+    private bool _isBusy;
+    private string _statusMessage = "Pronto para vender.";
+    private EntityId<Sale>? _lastSaleId;
+    private decimal? _lastTotal;
 
-    public bool IsBusy { get; private set; }
+    public event PropertyChangedEventHandler? PropertyChanged;
 
-    public string StatusMessage { get; private set; } = "Pronto para vender.";
+    public bool IsBusy
+    {
+        get => _isBusy;
+        private set => SetField(ref _isBusy, value);
+    }
 
-    public EntityId<Sale>? LastSaleId { get; private set; }
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        private set => SetField(ref _statusMessage, value);
+    }
 
-    public decimal? LastTotal { get; private set; }
+    public EntityId<Sale>? LastSaleId
+    {
+        get => _lastSaleId;
+        private set => SetField(ref _lastSaleId, value);
+    }
+
+    public decimal? LastTotal
+    {
+        get => _lastTotal;
+        private set => SetField(ref _lastTotal, value);
+    }
 
     public async Task<bool> FinalizeAsync(
         FinalizarVendaCommand command,
@@ -54,5 +78,20 @@ public sealed class SaleCheckoutViewModel(IFinalizarVenda finalizarVenda)
         {
             IsBusy = false;
         }
+    }
+
+    private bool SetField<T>(
+        ref T field,
+        T value,
+        [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+        {
+            return false;
+        }
+
+        field = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        return true;
     }
 }
