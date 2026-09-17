@@ -461,12 +461,20 @@
                                                        FontWeight="SemiBold"
                                                        HorizontalAlignment="Right"
                                                        VerticalAlignment="Center" />
-                                            <Button Grid.Column="3"
-                                                    Content="Adicionar"
-                                                    Margin="16,0,0,0"
-                                                    Command="{Binding DataContext.AddProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource PrimaryButton}" />
+                                            <StackPanel Grid.Column="3"
+                                                        Orientation="Horizontal"
+                                                        Margin="16,0,0,0">
+                                                <Button Content="Gerenciar"
+                                                        Command="{Binding DataContext.SelectProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource CompactButton}"
+                                                        Padding="10,0"
+                                                        Margin="0,0,8,0" />
+                                                <Button Content="Adicionar"
+                                                        Command="{Binding DataContext.AddProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource PrimaryButton}" />
+                                            </StackPanel>
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
@@ -614,7 +622,10 @@
                     </Grid>
                 </Border>
 
-                <StackPanel Grid.Column="2">
+                <ScrollViewer Grid.Column="2"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="0,0,4,0">
                     <Border x:Name="CheckoutStatusCard"
                             Background="{StaticResource SurfaceElevatedBrush}"
                             BorderBrush="{StaticResource BorderBrush}"
@@ -755,6 +766,120 @@
                         </Border>
                     </Expander>
 
+                    <Expander x:Name="ProductManagementPanel"
+                              Margin="0,18,0,0"
+                              Background="#0C141F"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              IsExpanded="False">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE70F;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           Foreground="#79B4FF"
+                                           Margin="0,0,9,0" />
+                                <TextBlock Text="GERENCIAR PRODUTO"
+                                           Style="{StaticResource SectionLabel}" />
+                            </StackPanel>
+                        </Expander.Header>
+                        <Border BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="16"
+                                Margin="0,10,0,0"
+                                IsEnabled="{Binding HasManagedProduct}">
+                            <StackPanel>
+                                <TextBlock Text="Selecione Gerenciar em um resultado da busca."
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,12" />
+
+                                <TextBlock Text="Nome"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           FontSize="11"
+                                           Margin="0,0,0,5" />
+                                <TextBox Text="{Binding ManagedProductName, UpdateSourceTrigger=PropertyChanged}"
+                                         Background="#091019"
+                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                         CaretBrush="White"
+                                         BorderBrush="#2B3D53"
+                                         Padding="9,7" />
+
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="10" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Venda"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   FontSize="11"
+                                                   Margin="0,0,0,5" />
+                                        <TextBox Text="{Binding ManagedProductUnitPrice, UpdateSourceTrigger=LostFocus, StringFormat=N2}"
+                                                 Background="#091019"
+                                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                                 CaretBrush="White"
+                                                 BorderBrush="#2B3D53"
+                                                 Padding="9,7" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Custo"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   FontSize="11"
+                                                   Margin="0,0,0,5" />
+                                        <TextBox Text="{Binding ManagedProductUnitCost, UpdateSourceTrigger=LostFocus, StringFormat=N2}"
+                                                 Background="#091019"
+                                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                                 CaretBrush="White"
+                                                 BorderBrush="#2B3D53"
+                                                 Padding="9,7" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Button x:Name="UpdateProductButton"
+                                        Content="Salvar alterações"
+                                        Command="{Binding UpdateProductCommand}"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Margin="0,14,0,0" />
+
+                                <Border Height="1"
+                                        Background="#26364A"
+                                        Margin="0,18" />
+
+                                <TextBlock Text="{Binding ManagedAvailableStock, StringFormat='Estoque atual: {0:N2}'}"
+                                           Foreground="#79B4FF"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="Ajuste (+ entrada / − saída)"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           FontSize="11"
+                                           Margin="0,12,0,5" />
+                                <TextBox Text="{Binding ManagedStockDelta, UpdateSourceTrigger=LostFocus, StringFormat=N2}"
+                                         Background="#091019"
+                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                         CaretBrush="White"
+                                         BorderBrush="#2B3D53"
+                                         Padding="9,7" />
+                                <TextBlock Text="Motivo obrigatório"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           FontSize="11"
+                                           Margin="0,12,0,5" />
+                                <TextBox Text="{Binding ManagedStockReason, UpdateSourceTrigger=PropertyChanged}"
+                                         Background="#091019"
+                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                         CaretBrush="White"
+                                         BorderBrush="#2B3D53"
+                                         Padding="9,7" />
+
+                                <Button x:Name="AdjustStockButton"
+                                        Content="Registrar ajuste"
+                                        Command="{Binding AdjustStockCommand}"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Margin="0,14,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
                     <Border Background="#0C141F"
                             BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
@@ -794,7 +919,8 @@
                             </Grid>
                         </StackPanel>
                     </Border>
-                </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
             </Grid>
         </Grid>
     </Grid>
