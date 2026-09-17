@@ -36,6 +36,26 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="18,10" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <Style x:Key="CompactButton" TargetType="Button">
+            <Setter Property="MinWidth" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Background" Value="#182536" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="#2B3D53" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
     </Window.Resources>
 
     <Grid Background="#070B12">
@@ -320,9 +340,9 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="24" />
+                            <RowDefinition Height="16" />
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="24" />
+                            <RowDefinition Height="16" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
@@ -336,7 +356,7 @@
                                            Foreground="{StaticResource TextPrimaryBrush}"
                                            FontSize="18"
                                            FontWeight="SemiBold" />
-                                <TextBlock Text="O fluxo de finalização já está conectado ao runtime real."
+                                <TextBlock Text="Busque produtos, ajuste quantidades e acompanhe o total em tempo real."
                                            Foreground="{StaticResource TextMutedBrush}"
                                            FontSize="12"
                                            Margin="0,5,0,0" />
@@ -353,41 +373,105 @@
                             </Border>
                         </Grid>
 
-                        <Border Grid.Row="2"
-                                Background="#0A1019"
-                                BorderBrush="#26364C"
-                                BorderThickness="1"
-                                CornerRadius="12"
-                                Height="58">
-                            <Grid Margin="16,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="34" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="&#xE721;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           Foreground="{StaticResource TextMutedBrush}"
-                                           FontSize="17"
-                                           VerticalAlignment="Center" />
-                                <StackPanel Grid.Column="1"
-                                            VerticalAlignment="Center">
-                                    <TextBlock Text="Leitura e busca de produto"
-                                               Foreground="{StaticResource TextSecondaryBrush}"
-                                               FontSize="13" />
-                                    <TextBlock Text="Interface preparada para código de barras, busca e atalhos."
-                                               Foreground="{StaticResource TextMutedBrush}"
-                                               FontSize="11"
-                                               Margin="0,2,0,0" />
-                                </StackPanel>
-                                <TextBlock Grid.Column="2"
-                                           Text="F2"
-                                           Foreground="#8EA3BC"
-                                           FontSize="11"
-                                           FontWeight="SemiBold"
-                                           VerticalAlignment="Center" />
-                            </Grid>
-                        </Border>
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="10" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Border Background="#0A1019"
+                                    BorderBrush="#26364C"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="10" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE721;"
+                                               FontFamily="Segoe MDL2 Assets"
+                                               Foreground="#79B4FF"
+                                               FontSize="17"
+                                               VerticalAlignment="Center" />
+                                    <TextBox x:Name="ProductSearchBox"
+                                             Grid.Column="1"
+                                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                             Background="Transparent"
+                                             Foreground="{StaticResource TextPrimaryBrush}"
+                                             CaretBrush="White"
+                                             BorderThickness="0"
+                                             FontSize="14"
+                                             VerticalContentAlignment="Center"
+                                             ToolTip="Digite o nome do produto">
+                                        <TextBox.InputBindings>
+                                            <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
+                                        </TextBox.InputBindings>
+                                    </TextBox>
+                                    <Button Grid.Column="3"
+                                            Content="Buscar"
+                                            Command="{Binding SearchCommand}"
+                                            Style="{StaticResource PrimaryButton}" />
+                                </Grid>
+                            </Border>
+
+                            <ListBox x:Name="ProductSearchResults"
+                                     Grid.Row="2"
+                                     ItemsSource="{Binding SearchResults}"
+                                     MaxHeight="150"
+                                     Background="#091019"
+                                     BorderBrush="#1C293A"
+                                     BorderThickness="1"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Background" Value="Transparent" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="14,9">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="100" />
+                                                <ColumnDefinition Width="100" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontWeight="SemiBold" />
+                                                <TextBlock Text="Produto disponível para venda"
+                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                           FontSize="11"
+                                                           Margin="0,3,0,0" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding AvailableStock, StringFormat='Estoque: {0:N2}'}"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding UnitPrice, StringFormat={}{0:C2}}"
+                                                       Foreground="#79B4FF"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center" />
+                                            <Button Grid.Column="3"
+                                                    Content="Adicionar"
+                                                    Margin="16,0,0,0"
+                                                    Command="{Binding DataContext.AddProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource PrimaryButton}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
 
                         <Grid Grid.Row="4">
                             <Grid.RowDefinitions>
@@ -397,19 +481,23 @@
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="130" />
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="44" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="ITEM"
                                            Style="{StaticResource SectionLabel}" />
                                 <TextBlock Grid.Column="1"
-                                           Text="QTD."
+                                           Text="QUANTIDADE"
                                            Style="{StaticResource SectionLabel}"
                                            HorizontalAlignment="Right" />
                                 <TextBlock Grid.Column="2"
                                            Text="TOTAL"
                                            Style="{StaticResource SectionLabel}"
                                            HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="3"
+                                           Text=""
+                                           Style="{StaticResource SectionLabel}" />
                             </Grid>
 
                             <Border Grid.Row="1"
@@ -418,33 +506,109 @@
                                     BorderBrush="#1C293A"
                                     BorderThickness="1"
                                     CornerRadius="12">
-                                <StackPanel HorizontalAlignment="Center"
-                                            VerticalAlignment="Center"
-                                            Margin="30">
-                                    <Border Width="52"
-                                            Height="52"
-                                            Background="#112033"
-                                            CornerRadius="14">
-                                        <TextBlock Text="&#xE719;"
-                                                   FontFamily="Segoe MDL2 Assets"
-                                                   Foreground="#6FAEFF"
-                                                   FontSize="22"
+                                <Grid>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl x:Name="SaleCartItems"
+                                                      ItemsSource="{Binding CartLines}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border BorderBrush="#1C293A"
+                                                            BorderThickness="0,0,0,1"
+                                                            Padding="16,12">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="150" />
+                                                                <ColumnDefinition Width="120" />
+                                                                <ColumnDefinition Width="44" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding ProductName}"
+                                                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                                                           FontWeight="SemiBold" />
+                                                                <TextBlock Text="{Binding UnitPrice, StringFormat='Unitário: {0:C2}'}"
+                                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                                           FontSize="11"
+                                                                           Margin="0,3,0,0" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="1"
+                                                                        Orientation="Horizontal"
+                                                                        HorizontalAlignment="Right"
+                                                                        VerticalAlignment="Center">
+                                                                <Button Content="−"
+                                                                        Command="{Binding DataContext.DecreaseQuantityCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding ProductId}"
+                                                                        Style="{StaticResource CompactButton}" />
+                                                                <TextBlock Text="{Binding Quantity, StringFormat={}{0:N2}}"
+                                                                           Width="58"
+                                                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                                                           TextAlignment="Center"
+                                                                           VerticalAlignment="Center" />
+                                                                <Button Content="+"
+                                                                        Command="{Binding DataContext.IncreaseQuantityCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding ProductId}"
+                                                                        Style="{StaticResource CompactButton}" />
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="2"
+                                                                       Text="{Binding LineTotal, StringFormat={}{0:C2}}"
+                                                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                                                       FontWeight="SemiBold"
+                                                                       HorizontalAlignment="Right"
+                                                                       VerticalAlignment="Center" />
+                                                            <Button Grid.Column="3"
+                                                                    Content="&#xE74D;"
+                                                                    FontFamily="Segoe MDL2 Assets"
+                                                                    Foreground="#F28B82"
+                                                                    ToolTip="Remover item"
+                                                                    Command="{Binding DataContext.RemoveProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding ProductId}"
+                                                                    Style="{StaticResource CompactButton}"
+                                                                    Margin="12,0,0,0" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <StackPanel HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Margin="30">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ElementName=SaleCartItems, Path=HasItems}"
+                                                                 Value="False">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+                                        <Border Width="52"
+                                                Height="52"
+                                                Background="#112033"
+                                                CornerRadius="14">
+                                            <TextBlock Text="&#xE719;"
+                                                       FontFamily="Segoe MDL2 Assets"
+                                                       Foreground="#6FAEFF"
+                                                       FontSize="22"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Text="Nenhum item na venda"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold"
                                                    HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="Nenhum item na venda"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
-                                               FontSize="15"
-                                               FontWeight="SemiBold"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,14,0,0" />
-                                    <TextBlock Text="A área de itens será ligada ao carrinho persistente no próximo ciclo."
-                                               Foreground="{StaticResource TextMutedBrush}"
-                                               FontSize="12"
-                                               TextAlignment="Center"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,6,0,0" />
-                                </StackPanel>
+                                                   Margin="0,14,0,0" />
+                                        <TextBlock Text="Busque um produto acima e selecione Adicionar."
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   FontSize="12"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,6,0,0" />
+                                    </StackPanel>
+                                </Grid>
                             </Border>
                         </Grid>
                     </Grid>
@@ -466,6 +630,25 @@
                                        FontWeight="SemiBold"
                                        TextWrapping="Wrap"
                                        Margin="0,12,0,0" />
+                            <Border Height="1"
+                                    Background="#26364A"
+                                    Margin="0,20" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Subtotal atual"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="12"
+                                           VerticalAlignment="Center" />
+                                <TextBlock x:Name="CartSubtotal"
+                                           Grid.Column="1"
+                                           Text="{Binding CartSubtotal, StringFormat={}{0:C2}}"
+                                           Foreground="#79B4FF"
+                                           FontSize="22"
+                                           FontWeight="SemiBold" />
+                            </Grid>
                             <Border Height="1"
                                     Background="#26364A"
                                     Margin="0,20" />
