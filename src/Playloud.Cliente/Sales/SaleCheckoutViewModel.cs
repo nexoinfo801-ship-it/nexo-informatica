@@ -16,9 +16,14 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     private readonly IFinalizarVenda _finalizarVenda;
     private readonly ISearchProducts _searchProducts;
     private readonly SaleCart _cart;
+    private readonly ICreateProduct _createProduct;
     private bool _isBusy;
     private string _statusMessage = "Pronto para vender.";
     private string _searchText = string.Empty;
+    private string _newProductName = string.Empty;
+    private decimal _newProductUnitPrice;
+    private decimal _newProductUnitCost;
+    private decimal _newProductOpeningStock;
     private EntityId<Sale>? _lastSaleId;
     private decimal? _lastTotal;
 
@@ -31,12 +36,23 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
         IFinalizarVenda finalizarVenda,
         ISearchProducts searchProducts,
         SaleCart cart)
+        : this(finalizarVenda, searchProducts, cart, new EmptyCreateProduct())
+    {
+    }
+
+    public SaleCheckoutViewModel(
+        IFinalizarVenda finalizarVenda,
+        ISearchProducts searchProducts,
+        SaleCart cart,
+        ICreateProduct createProduct)
     {
         _finalizarVenda = finalizarVenda ?? throw new ArgumentNullException(nameof(finalizarVenda));
         _searchProducts = searchProducts ?? throw new ArgumentNullException(nameof(searchProducts));
         _cart = cart ?? throw new ArgumentNullException(nameof(cart));
+        _createProduct = createProduct ?? throw new ArgumentNullException(nameof(createProduct));
 
         SearchCommand = new AsyncRelayCommand(() => SearchAsync());
+        CreateProductCommand = new AsyncRelayCommand(() => CreateProductAsync());
         AddProductCommand = new RelayCommand(parameter =>
         {
             if (parameter is ProductSearchResult product)
@@ -75,6 +91,8 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
 
     public ICommand SearchCommand { get; }
 
+    public ICommand CreateProductCommand { get; }
+
     public ICommand AddProductCommand { get; }
 
     public ICommand IncreaseQuantityCommand { get; }
@@ -99,6 +117,30 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     {
         get => _searchText;
         set => SetField(ref _searchText, value ?? string.Empty);
+    }
+
+    public string NewProductName
+    {
+        get => _newProductName;
+        set => SetField(ref _newProductName, value ?? string.Empty);
+    }
+
+    public decimal NewProductUnitPrice
+    {
+        get => _newProductUnitPrice;
+        set => SetField(ref _newProductUnitPrice, value);
+    }
+
+    public decimal NewProductUnitCost
+    {
+        get => _newProductUnitCost;
+        set => SetField(ref _newProductUnitCost, value);
+    }
+
+    public decimal NewProductOpeningStock
+    {
+        get => _newProductOpeningStock;
+        set => SetField(ref _newProductOpeningStock, value);
     }
 
     public decimal CartSubtotal => _cart.Subtotal;
@@ -149,6 +191,53 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
         catch
         {
             StatusMessage = "Ocorreu uma falha inesperada durante a busca.";
+            throw;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task<bool> CreateProductAsync(
+        CancellationToken cancellationToken = default)
+    {
+        IsBusy = true;
+        StatusMessage = "Cadastrando produto...";
+
+        try
+        {
+            var result = await _createProduct.ExecuteAsync(
+                new Playloud.Application.Catalog.CreateProductCommand(
+                    NewProductName,
+                    NewProductUnitPrice,
+                    NewProductUnitCost,
+                    NewProductOpeningStock),
+                cancellationToken);
+
+            NewProductName = string.Empty;
+            NewProductUnitPrice = 0m;
+            NewProductUnitCost = 0m;
+            NewProductOpeningStock = 0m;
+            SearchText = result.Name;
+
+            await SearchAsync(cancellationToken);
+            StatusMessage = "Produto cadastrado e pronto para venda.";
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            StatusMessage = "Já existe um produto com este nome.";
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            StatusMessage = "Revise nome, preços e estoque inicial.";
+            return false;
+        }
+        catch
+        {
+            StatusMessage = "Ocorreu uma falha inesperada durante o cadastro.";
             throw;
         }
         finally
@@ -280,6 +369,14 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
 
     private void OnPropertyChanged(string? propertyName) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    private sealed class EmptyCreateProduct : ICreateProduct
+    {
+        public Task<CreateProductResult> ExecuteAsync(
+            Playloud.Application.Catalog.CreateProductCommand command,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Product registration is not configured.");
+    }
 
     private sealed class EmptySearchProducts : ISearchProducts
     {
