@@ -1,3 +1,4 @@
+using Playloud.Application.Catalog;
 using Playloud.Application.Sales;
 using Playloud.Cliente.Sales;
 using Playloud.Persistence.Sqlite;
@@ -29,7 +30,11 @@ public sealed class ClienteRuntime : IAsyncDisposable
             await store.InitializeAsync(cancellationToken);
             var adapter = new SqliteCommerceAdapter(store);
             IFinalizarVenda finalizarVenda = new FinalizarVenda(adapter, adapter);
-            var checkout = new SaleCheckoutViewModel(finalizarVenda);
+            ISearchProducts searchProducts = new SearchProducts(adapter);
+            var checkout = new SaleCheckoutViewModel(
+                finalizarVenda,
+                searchProducts,
+                new SaleCart());
             return new ClienteRuntime(store, checkout);
         }
         catch
