@@ -479,7 +479,7 @@
                                            FontSize="12"
                                            VerticalAlignment="Center" />
                                 <TextBlock Grid.Column="1"
-                                           Text="{Binding LastTotal, StringFormat={}{0:C2}, TargetNullValue=R$ 0,00}"
+                                           Text="{Binding LastTotal, StringFormat={}{0:C2}, TargetNullValue='R$ 0,00'}"
                                            Foreground="{StaticResource TextPrimaryBrush}"
                                            FontSize="18"
                                            FontWeight="SemiBold" />
