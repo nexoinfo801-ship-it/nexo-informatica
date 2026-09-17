@@ -1,4 +1,5 @@
 using System.Threading;
+using System.Windows.Controls;
 using Playloud.Application.Sales;
 using Playloud.Cliente.Sales;
 using Playloud.Cliente.Shell;
@@ -22,6 +23,43 @@ public sealed class MainWindowCompositionTests
                 var window = new MainWindow(viewModel);
 
                 Assert.Same(viewModel, window.DataContext);
+                window.Close();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+        {
+            throw failure;
+        }
+    }
+
+    [Fact]
+    public void MainWindow_exposes_commercial_shell_regions()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var viewModel = new SaleCheckoutViewModel(new StubFinalizarVenda());
+                var window = new MainWindow(viewModel);
+
+                Assert.NotNull(window.FindName("NavigationRail"));
+                Assert.NotNull(window.FindName("OperationalHeader"));
+                Assert.NotNull(window.FindName("SalesWorkspace"));
+                Assert.NotNull(window.FindName("CheckoutStatusCard"));
+
+                var productTitle = Assert.IsType<TextBlock>(window.FindName("ProductTitle"));
+                Assert.Equal("Playloud PDV & ERP", productTitle.Text);
+
                 window.Close();
             }
             catch (Exception exception)
