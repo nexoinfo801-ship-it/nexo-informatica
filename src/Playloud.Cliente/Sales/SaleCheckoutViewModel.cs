@@ -2,23 +2,38 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Playloud.Application.Cash;
 using Playloud.Application.Catalog;
 using Playloud.Application.Sales;
 using Playloud.Cliente.Common;
+using Playloud.Domain.Cash;
 using Playloud.Domain.Catalog;
 using Playloud.Domain.Common;
+using Playloud.Domain.Payments;
 using Playloud.Domain.Sales;
 
 namespace Playloud.Cliente.Sales;
 
+public sealed record PaymentMethodOption(PaymentMethod Method, string Label);
+
 public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
 {
+    private static readonly IReadOnlyList<PaymentMethodOption> AvailablePaymentMethods =
+    [
+        new(PaymentMethod.Cash, "Dinheiro"),
+        new(PaymentMethod.Pix, "Pix"),
+        new(PaymentMethod.DebitCard, "Cartão de débito"),
+        new(PaymentMethod.CreditCard, "Cartão de crédito")
+    ];
+
     private readonly IFinalizarVenda _finalizarVenda;
     private readonly ISearchProducts _searchProducts;
     private readonly SaleCart _cart;
     private readonly ICreateProduct _createProduct;
     private readonly UpdateProduct _updateProduct;
     private readonly AdjustProductStock _adjustProductStock;
+    private readonly IOpenCashSession _openCashSession;
+    private readonly DateOnly _businessDate;
     private bool _isBusy;
     private string _statusMessage = "Pronto para vender.";
     private string _searchText = string.Empty;
@@ -35,6 +50,11 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     private string _managedStockReason = string.Empty;
     private EntityId<Sale>? _lastSaleId;
     private decimal? _lastTotal;
+    private ActiveCashSession? _activeCashSession;
+    private decimal _openingBalance;
+    private PaymentMethodOption _selectedPaymentMethod = AvailablePaymentMethods[0];
+    private decimal _amountReceived;
+    private decimal _lastChangeDue;
 
     public SaleCheckoutViewModel(IFinalizarVenda finalizarVenda)
         : this(finalizarVenda, new EmptySearchProducts(), new SaleCart())
@@ -68,9 +88,48 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
         IFinalizarVenda finalizarVenda,
         ISearchProducts searchProducts,
         SaleCart cart,
+        IOpenCashSession openCashSession,
+        TimeProvider timeProvider)
+        : this(
+            finalizarVenda,
+            searchProducts,
+            cart,
+            new EmptyCreateProduct(),
+            new UpdateProduct(new EmptyProductCatalogManager()),
+            new AdjustProductStock(new EmptyProductStockAdjuster()),
+            openCashSession,
+            timeProvider)
+    {
+    }
+
+    public SaleCheckoutViewModel(
+        IFinalizarVenda finalizarVenda,
+        ISearchProducts searchProducts,
+        SaleCart cart,
         ICreateProduct createProduct,
         UpdateProduct updateProduct,
         AdjustProductStock adjustProductStock)
+        : this(
+            finalizarVenda,
+            searchProducts,
+            cart,
+            createProduct,
+            updateProduct,
+            adjustProductStock,
+            new UnavailableOpenCashSession(),
+            TimeProvider.System)
+    {
+    }
+
+    public SaleCheckoutViewModel(
+        IFinalizarVenda finalizarVenda,
+        ISearchProducts searchProducts,
+        SaleCart cart,
+        ICreateProduct createProduct,
+        UpdateProduct updateProduct,
+        AdjustProductStock adjustProductStock,
+        IOpenCashSession openCashSession,
+        TimeProvider timeProvider)
     {
         _finalizarVenda = finalizarVenda ?? throw new ArgumentNullException(nameof(finalizarVenda));
         _searchProducts = searchProducts ?? throw new ArgumentNullException(nameof(searchProducts));
@@ -79,11 +138,17 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
         _updateProduct = updateProduct ?? throw new ArgumentNullException(nameof(updateProduct));
         _adjustProductStock =
             adjustProductStock ?? throw new ArgumentNullException(nameof(adjustProductStock));
+        _openCashSession =
+            openCashSession ?? throw new ArgumentNullException(nameof(openCashSession));
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        _businessDate = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
 
         SearchCommand = new AsyncRelayCommand(() => SearchAsync());
         CreateProductCommand = new AsyncRelayCommand(() => CreateProductAsync());
         UpdateProductCommand = new AsyncRelayCommand(() => UpdateManagedProductAsync());
         AdjustStockCommand = new AsyncRelayCommand(() => AdjustManagedStockAsync());
+        OpenCashCommand = new AsyncRelayCommand(() => OpenCashSessionAsync());
+        FinalizeCurrentSaleCommand = new AsyncRelayCommand(() => FinalizeCurrentSaleAsync());
         SelectProductCommand = new RelayCommand(parameter =>
         {
             if (parameter is ProductSearchResult product)
@@ -134,6 +199,10 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     public ICommand UpdateProductCommand { get; }
 
     public ICommand AdjustStockCommand { get; }
+
+    public ICommand OpenCashCommand { get; }
+
+    public ICommand FinalizeCurrentSaleCommand { get; }
 
     public ICommand SelectProductCommand { get; }
 
@@ -228,6 +297,55 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     public decimal CartSubtotal => _cart.Subtotal;
 
     public bool HasCartItems => CartLines.Count > 0;
+
+    public DateOnly BusinessDate => _businessDate;
+
+    public IReadOnlyList<PaymentMethodOption> PaymentMethods => AvailablePaymentMethods;
+
+    public decimal OpeningBalance
+    {
+        get => _openingBalance;
+        set => SetField(ref _openingBalance, value);
+    }
+
+    public bool HasOpenCashSession => _activeCashSession is not null;
+
+    public PaymentMethodOption SelectedPaymentMethod
+    {
+        get => _selectedPaymentMethod;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (SetField(ref _selectedPaymentMethod, value))
+            {
+                OnPropertyChanged(nameof(ChangeDue));
+            }
+        }
+    }
+
+    public decimal AmountReceived
+    {
+        get => _amountReceived;
+        set
+        {
+            if (SetField(ref _amountReceived, value))
+            {
+                OnPropertyChanged(nameof(ChangeDue));
+            }
+        }
+    }
+
+    public decimal ChangeDue =>
+        SelectedPaymentMethod.Method == PaymentMethod.Cash &&
+        AmountReceived > CartSubtotal
+            ? AmountReceived - CartSubtotal
+            : 0m;
+
+    public decimal LastChangeDue
+    {
+        get => _lastChangeDue;
+        private set => SetField(ref _lastChangeDue, value);
+    }
 
     public EntityId<Sale>? LastSaleId
     {
@@ -500,6 +618,83 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
         }
     }
 
+    public async Task<bool> OpenCashSessionAsync(
+        CancellationToken cancellationToken = default)
+    {
+        IsBusy = true;
+        StatusMessage = "Abrindo caixa...";
+
+        try
+        {
+            var session = await _openCashSession.ExecuteAsync(
+                new OpenCashSessionCommand(BusinessDate, OpeningBalance),
+                cancellationToken);
+            _activeCashSession = session;
+            OpeningBalance = session.OpeningBalance;
+            OnPropertyChanged(nameof(HasOpenCashSession));
+            StatusMessage = "Caixa aberto e pronto para vendas.";
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            StatusMessage = "O saldo inicial do caixa não pode ser negativo.";
+            return false;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public async Task<bool> FinalizeCurrentSaleAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_activeCashSession is not ActiveCashSession session)
+        {
+            StatusMessage = "Abra o caixa antes de finalizar a venda.";
+            return false;
+        }
+
+        if (_cart.Lines.Count == 0)
+        {
+            StatusMessage = "Adicione ao menos um produto à venda.";
+            return false;
+        }
+
+        if (SelectedPaymentMethod.Method == PaymentMethod.Cash &&
+            AmountReceived < CartSubtotal)
+        {
+            StatusMessage = "O valor recebido é menor que o total da venda.";
+            return false;
+        }
+
+        var changeDue = ChangeDue;
+        var command = new FinalizarVendaCommand(
+            session.BusinessDate,
+            session.Id,
+            _cart.Lines
+                .Select(static line => new FinalizarVendaItem(
+                    line.ProductId,
+                    line.Quantity))
+                .ToArray(),
+            [
+                new FinalizarVendaPayment(
+                    SelectedPaymentMethod.Method,
+                    CartSubtotal)
+            ]);
+
+        if (!await FinalizeAsync(command, cancellationToken))
+        {
+            return false;
+        }
+
+        LastChangeDue = changeDue;
+        _cart.Clear();
+        RefreshCart();
+        AmountReceived = 0m;
+        return true;
+    }
+
     public async Task<bool> FinalizeAsync(
         FinalizarVendaCommand command,
         CancellationToken cancellationToken = default)
@@ -549,6 +744,7 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
 
         OnPropertyChanged(nameof(CartSubtotal));
         OnPropertyChanged(nameof(HasCartItems));
+        OnPropertyChanged(nameof(ChangeDue));
     }
 
     private bool SetField<T>(
@@ -568,6 +764,14 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
 
     private void OnPropertyChanged(string? propertyName) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    private sealed class UnavailableOpenCashSession : IOpenCashSession
+    {
+        public Task<ActiveCashSession> ExecuteAsync(
+            OpenCashSessionCommand command,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Cash opening is not configured.");
+    }
 
     private sealed class EmptyProductCatalogManager : IProductCatalogManager
     {
