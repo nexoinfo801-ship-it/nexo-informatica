@@ -1,3 +1,4 @@
+using Playloud.Application.Cash;
 using Playloud.Application.Catalog;
 using Playloud.Application.Sales;
 using Playloud.Cliente.Sales;
@@ -34,13 +35,16 @@ public sealed class ClienteRuntime : IAsyncDisposable
             ICreateProduct createProduct = new CreateProduct(adapter);
             var updateProduct = new UpdateProduct(adapter);
             var adjustProductStock = new AdjustProductStock(adapter);
+            IOpenCashSession openCashSession = new OpenCashSession(adapter);
             var checkout = new SaleCheckoutViewModel(
                 finalizarVenda,
                 searchProducts,
                 new SaleCart(),
                 createProduct,
                 updateProduct,
-                adjustProductStock);
+                adjustProductStock,
+                openCashSession,
+                TimeProvider.System);
             return new ClienteRuntime(store, checkout);
         }
         catch

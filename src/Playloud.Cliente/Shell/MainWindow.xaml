@@ -681,6 +681,115 @@
                         </StackPanel>
                     </Border>
 
+                    <Expander x:Name="CashOpeningPanel"
+                              Margin="0,18,0,0"
+                              Background="#0C141F"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              IsExpanded="True">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE7E8;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           Foreground="#79B4FF"
+                                           Margin="0,0,9,0" />
+                                <TextBlock Text="ABERTURA DO CAIXA"
+                                           Style="{StaticResource SectionLabel}" />
+                            </StackPanel>
+                        </Expander.Header>
+                        <Border BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="16"
+                                Margin="0,10,0,0">
+                            <StackPanel>
+                                <TextBlock Text="{Binding BusinessDate, StringFormat='Data operacional: {0:dd/MM/yyyy}'}"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="11" />
+                                <TextBlock Text="Saldo inicial"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           FontSize="11"
+                                           Margin="0,12,0,5" />
+                                <TextBox Text="{Binding OpeningBalance, UpdateSourceTrigger=LostFocus, StringFormat=N2}"
+                                         Background="#091019"
+                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                         CaretBrush="White"
+                                         BorderBrush="#2B3D53"
+                                         Padding="9,7" />
+                                <Button x:Name="OpenCashButton"
+                                        Content="Abrir ou recuperar caixa"
+                                        Command="{Binding OpenCashCommand}"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Margin="0,14,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
+                    <Border x:Name="PaymentPanel"
+                            Margin="0,18,0,0"
+                            Background="#0C141F"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="18">
+                        <StackPanel>
+                            <TextBlock Text="PAGAMENTO"
+                                       Style="{StaticResource SectionLabel}" />
+                            <TextBlock Text="Forma de pagamento"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="11"
+                                       Margin="0,14,0,5" />
+                            <ComboBox x:Name="PaymentMethodSelector"
+                                      ItemsSource="{Binding PaymentMethods}"
+                                      SelectedItem="{Binding SelectedPaymentMethod, Mode=TwoWay}"
+                                      DisplayMemberPath="Label"
+                                      Background="#091019"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      BorderBrush="#2B3D53"
+                                      Padding="7" />
+                            <TextBlock Text="Valor recebido (dinheiro)"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="11"
+                                       Margin="0,12,0,5" />
+                            <TextBox x:Name="AmountReceivedBox"
+                                     Text="{Binding AmountReceived, UpdateSourceTrigger=LostFocus, StringFormat=N2}"
+                                     Background="#091019"
+                                     Foreground="{StaticResource TextPrimaryBrush}"
+                                     CaretBrush="White"
+                                     BorderBrush="#2B3D53"
+                                     Padding="9,7" />
+                            <Grid Margin="0,16,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="TOTAL"
+                                               Style="{StaticResource SectionLabel}" />
+                                    <TextBlock Text="{Binding CartSubtotal, StringFormat={}{0:C2}}"
+                                               Foreground="#79B4FF"
+                                               FontSize="22"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            HorizontalAlignment="Right">
+                                    <TextBlock Text="TROCO"
+                                               Style="{StaticResource SectionLabel}"
+                                               HorizontalAlignment="Right" />
+                                    <TextBlock Text="{Binding ChangeDue, StringFormat={}{0:C2}}"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               HorizontalAlignment="Right" />
+                                </StackPanel>
+                            </Grid>
+                            <Button x:Name="FinalizeSaleButton"
+                                    Content="Finalizar venda"
+                                    Command="{Binding FinalizeCurrentSaleCommand}"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Margin="0,16,0,0" />
+                        </StackPanel>
+                    </Border>
+
                     <Expander x:Name="ProductRegistrationPanel"
                               Margin="0,18,0,0"
                               Background="#0C141F"
