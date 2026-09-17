@@ -67,7 +67,8 @@ public sealed class SqliteCommerceAdapter(
                 product.Id,
                 product.Name,
                 product.UnitPrice,
-                product.AvailableStock))
+                product.AvailableStock,
+                product.UnitCost))
             .ToArray();
     }
 }
