@@ -43,9 +43,16 @@ public sealed record FinalizarVendaResult(
     decimal GrossTotal,
     IReadOnlyList<FinalizarVendaPayment> Payments);
 
+public interface IFinalizarVenda
+{
+    Task<FinalizarVendaResult> ExecuteAsync(
+        FinalizarVendaCommand command,
+        CancellationToken cancellationToken = default);
+}
+
 public sealed class FinalizarVenda(
     IProductSnapshotReader productSnapshotReader,
-    ISaleCommitter saleCommitter)
+    ISaleCommitter saleCommitter) : IFinalizarVenda
 {
     public async Task<FinalizarVendaResult> ExecuteAsync(
         FinalizarVendaCommand command,
