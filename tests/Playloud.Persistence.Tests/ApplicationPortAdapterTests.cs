@@ -1,3 +1,4 @@
+using Playloud.Application.Catalog;
 using Playloud.Application.Sales;
 using Playloud.Domain.Cash;
 using Playloud.Domain.Catalog;
@@ -79,5 +80,28 @@ public sealed class ApplicationPortAdapterTests : IAsyncLifetime
         Assert.Equal(product.UnitPrice, snapshot.UnitPrice);
         Assert.Equal(product.UnitCost, snapshot.UnitCost);
         Assert.Equal(7m, snapshot.AvailableStock);
+    }
+
+    [Fact]
+    public async Task Product_search_finds_commercial_names_and_returns_current_stock()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var store = new SqliteCommerceStore(_databasePath);
+        await store.InitializeAsync(cancellationToken);
+        var adapter = new SqliteCommerceAdapter(store);
+
+        var coffee = Product.Create("Café Especial", 18.90m, 9.40m);
+        var chocolate = Product.Create("Chocolate", 7.50m, 3m);
+        await store.SaveProductAsync(coffee, openingStock: 12m, cancellationToken);
+        await store.SaveProductAsync(chocolate, openingStock: 8m, cancellationToken);
+
+        IProductSearchReader reader = adapter;
+        var results = await reader.SearchAsync("café", 20, cancellationToken);
+
+        var result = Assert.Single(results);
+        Assert.Equal(coffee.Id, result.Id);
+        Assert.Equal("Café Especial", result.Name);
+        Assert.Equal(18.90m, result.UnitPrice);
+        Assert.Equal(12m, result.AvailableStock);
     }
 }
