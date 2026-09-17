@@ -18,10 +18,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 10
+      - name: Check pinned .NET SDK
+        id: dotnet_sdk
+        shell: pwsh
+        run: |
+          $required = (Get-Content global.json -Raw | ConvertFrom-Json).sdk.version
+          $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+          $installed = @()
+
+          if ($null -ne $dotnet) {
+            $installed = @(dotnet --list-sdks | ForEach-Object { ($_ -split '\s+')[0] })
+          }
+
+          $needsSetup = -not ($installed -contains $required)
+          "required=$required" >> $env:GITHUB_OUTPUT
+          "needs_setup=$($needsSetup.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Required SDK: $required"
+          Write-Host "Installed SDKs: $($installed -join ', ')"
+          Write-Host "Needs setup: $needsSetup"
+
+      - name: Setup pinned .NET SDK when missing
+        if: steps.dotnet_sdk.outputs.needs_setup == 'true'
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: ${{ steps.dotnet_sdk.outputs.required }}
 
       - name: Show SDK
         run: dotnet --info
