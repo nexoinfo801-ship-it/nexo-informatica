@@ -26,7 +26,7 @@ public sealed class ClienteApplicationHostTests : IAsyncLifetime
     }
 
     [Fact]
-    public void Create_builds_window_with_runtime_checkout_as_data_context()
+    public void CreateMainWindow_uses_runtime_checkout_as_data_context()
     {
         Exception? failure = null;
         var thread = new Thread(() =>
@@ -38,10 +38,12 @@ public sealed class ClienteApplicationHostTests : IAsyncLifetime
                     _databasePath,
                     cancellation.Token).GetAwaiter().GetResult();
 
-                Assert.Same(host.Checkout, host.MainWindow.DataContext);
-                Assert.IsType<SaleCheckoutViewModel>(host.MainWindow.DataContext);
+                var window = host.CreateMainWindow();
 
-                host.MainWindow.Close();
+                Assert.Same(host.Checkout, window.DataContext);
+                Assert.IsType<SaleCheckoutViewModel>(window.DataContext);
+
+                window.Close();
                 host.DisposeAsync().AsTask().GetAwaiter().GetResult();
             }
             catch (Exception exception)
