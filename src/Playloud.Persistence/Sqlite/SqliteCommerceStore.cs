@@ -20,7 +20,8 @@ public sealed record StoredProductSearchResult(
     EntityId<Product> Id,
     string Name,
     decimal UnitPrice,
-    decimal AvailableStock);
+    decimal AvailableStock,
+    decimal UnitCost);
 
 public sealed record StoredStockAdjustment(
     decimal QuantityDelta,
@@ -551,7 +552,7 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
         await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT p.id, p.name, p.unit_price, s.quantity
+            SELECT p.id, p.name, p.unit_price, s.quantity, p.unit_cost
             FROM products AS p
             INNER JOIN stock AS s ON s.product_id = p.id
             WHERE p.name LIKE $contains ESCAPE '\' COLLATE NOCASE
@@ -576,7 +577,8 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
                 new EntityId<Product>(Guid.Parse(reader.GetString(0))),
                 reader.GetString(1),
                 FromStorageDecimal(reader.GetString(2)),
-                FromStorageDecimal(reader.GetString(3))));
+                FromStorageDecimal(reader.GetString(3)),
+                FromStorageDecimal(reader.GetString(4))));
         }
 
         return results;
