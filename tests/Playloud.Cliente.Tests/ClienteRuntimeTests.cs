@@ -47,4 +47,20 @@ public sealed class ClienteRuntimeTests : IAsyncLifetime
         File.Delete(_databasePath);
         Assert.False(File.Exists(_databasePath));
     }
+    [Fact]
+    public async Task Runtime_wires_real_cash_opening()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var runtime = await ClienteRuntime.CreateAsync(
+            _databasePath,
+            cancellationToken);
+        runtime.Checkout.OpeningBalance = 75m;
+
+        var opened = await runtime.Checkout.OpenCashSessionAsync(cancellationToken);
+
+        Assert.True(opened);
+        Assert.True(runtime.Checkout.HasOpenCashSession);
+        Assert.Equal(75m, runtime.Checkout.OpeningBalance);
+    }
+
 }
