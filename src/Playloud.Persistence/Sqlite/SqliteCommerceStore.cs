@@ -22,6 +22,12 @@ public sealed record StoredProductSearchResult(
     decimal UnitPrice,
     decimal AvailableStock);
 
+public sealed record StoredStockAdjustment(
+    decimal QuantityDelta,
+    decimal ResultingStock,
+    string Reason,
+    DateTimeOffset CreatedAtUtc);
+
 public sealed class SqliteCommerceStore : IAsyncDisposable
 {
     private readonly string _databasePath;
@@ -71,6 +77,16 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
             CREATE TABLE IF NOT EXISTS stock (
                 product_id TEXT PRIMARY KEY NOT NULL,
                 quantity TEXT NOT NULL,
+                FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
+            );
+
+            CREATE TABLE IF NOT EXISTS stock_adjustments (
+                id TEXT PRIMARY KEY NOT NULL,
+                product_id TEXT NOT NULL,
+                quantity_delta TEXT NOT NULL,
+                resulting_stock TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                created_at_utc TEXT NOT NULL,
                 FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
             );
 
@@ -132,7 +148,7 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
                 FOREIGN KEY (cash_session_id) REFERENCES cash_sessions(id) ON DELETE RESTRICT
             );
 
-            PRAGMA user_version=3;
+            PRAGMA user_version=4;
             """;
         await schema.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -564,6 +580,171 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
         }
 
         return results;
+    }
+
+    public async Task UpdateProductAsync(
+        Product product,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(product);
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+
+        try
+        {
+            await using (var duplicate = connection.CreateCommand())
+            {
+                duplicate.Transaction = transaction;
+                duplicate.CommandText = """
+                    SELECT 1
+                    FROM products
+                    WHERE name = $name COLLATE NOCASE
+                      AND id <> $id
+                    LIMIT 1;
+                    """;
+                duplicate.Parameters.AddWithValue("$name", product.Name);
+                duplicate.Parameters.AddWithValue("$id", product.Id.ToString());
+
+                if (await duplicate.ExecuteScalarAsync(cancellationToken) is not null)
+                {
+                    throw new InvalidOperationException(
+                        "A product with the same commercial name already exists.");
+                }
+            }
+
+            await using (var update = connection.CreateCommand())
+            {
+                update.Transaction = transaction;
+                update.CommandText = """
+                    UPDATE products
+                    SET name = $name,
+                        unit_price = $unitPrice,
+                        unit_cost = $unitCost
+                    WHERE id = $id;
+                    """;
+                update.Parameters.AddWithValue("$id", product.Id.ToString());
+                update.Parameters.AddWithValue("$name", product.Name);
+                update.Parameters.AddWithValue("$unitPrice", ToStorageDecimal(product.UnitPrice));
+                update.Parameters.AddWithValue("$unitCost", ToStorageDecimal(product.UnitCost));
+
+                if (await update.ExecuteNonQueryAsync(cancellationToken) != 1)
+                {
+                    throw new KeyNotFoundException($"Product {product.Id} was not found.");
+                }
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<decimal> AdjustStockAsync(
+        EntityId<Product> productId,
+        decimal quantityDelta,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        if (quantityDelta == 0m)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(quantityDelta),
+                "Stock adjustment must change the current quantity.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("Stock adjustment reason is required.", nameof(reason));
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+
+        try
+        {
+            var currentStock = await ReadStockAsync(
+                connection,
+                transaction,
+                productId,
+                cancellationToken);
+            var resultingStock = currentStock + quantityDelta;
+
+            if (resultingStock < 0m)
+            {
+                throw new InvalidOperationException(
+                    "Stock adjustment cannot make available stock negative.");
+            }
+
+            await WriteStockAsync(
+                connection,
+                transaction,
+                productId,
+                resultingStock,
+                cancellationToken);
+
+            await using (var evidence = connection.CreateCommand())
+            {
+                evidence.Transaction = transaction;
+                evidence.CommandText = """
+                    INSERT INTO stock_adjustments (
+                        id, product_id, quantity_delta, resulting_stock, reason, created_at_utc)
+                    VALUES (
+                        $id, $productId, $quantityDelta, $resultingStock, $reason, $createdAtUtc);
+                    """;
+                evidence.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("D"));
+                evidence.Parameters.AddWithValue("$productId", productId.ToString());
+                evidence.Parameters.AddWithValue("$quantityDelta", ToStorageDecimal(quantityDelta));
+                evidence.Parameters.AddWithValue("$resultingStock", ToStorageDecimal(resultingStock));
+                evidence.Parameters.AddWithValue("$reason", reason.Trim());
+                evidence.Parameters.AddWithValue(
+                    "$createdAtUtc",
+                    DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+                await evidence.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return resultingStock;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<StoredStockAdjustment>> GetStockAdjustmentsAsync(
+        EntityId<Product> productId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT quantity_delta, resulting_stock, reason, created_at_utc
+            FROM stock_adjustments
+            WHERE product_id = $productId
+            ORDER BY rowid;
+            """;
+        command.Parameters.AddWithValue("$productId", productId.ToString());
+
+        var result = new List<StoredStockAdjustment>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(new StoredStockAdjustment(
+                FromStorageDecimal(reader.GetString(0)),
+                FromStorageDecimal(reader.GetString(1)),
+                reader.GetString(2),
+                DateTimeOffset.Parse(
+                    reader.GetString(3),
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind)));
+        }
+
+        return result;
     }
 
     public async Task<decimal> GetStockAsync(

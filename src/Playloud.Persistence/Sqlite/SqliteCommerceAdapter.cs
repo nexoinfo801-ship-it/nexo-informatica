@@ -8,7 +8,7 @@ using Playloud.Domain.Sales;
 namespace Playloud.Persistence.Sqlite;
 
 public sealed class SqliteCommerceAdapter(
-    SqliteCommerceStore store) : IProductSnapshotReader, IProductSearchReader, IProductCatalogWriter, ISaleCommitter
+    SqliteCommerceStore store) : IProductSnapshotReader, IProductSearchReader, IProductCatalogWriter, IProductCatalogManager, IProductStockAdjuster, ISaleCommitter
 {
     private readonly SqliteCommerceStore _store = store ?? throw new ArgumentNullException(nameof(store));
 
@@ -43,6 +43,18 @@ public sealed class SqliteCommerceAdapter(
         decimal openingStock,
         CancellationToken cancellationToken = default) =>
         _store.SaveProductAsync(product, openingStock, cancellationToken);
+
+    public Task UpdateAsync(
+        Product product,
+        CancellationToken cancellationToken = default) =>
+        _store.UpdateProductAsync(product, cancellationToken);
+
+    public Task<decimal> AdjustAsync(
+        EntityId<Product> productId,
+        decimal quantityDelta,
+        string reason,
+        CancellationToken cancellationToken = default) =>
+        _store.AdjustStockAsync(productId, quantityDelta, reason, cancellationToken);
 
     public async Task<IReadOnlyList<ProductSearchResult>> SearchAsync(
         string query,
