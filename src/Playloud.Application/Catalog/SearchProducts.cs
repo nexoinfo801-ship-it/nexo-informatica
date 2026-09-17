@@ -7,7 +7,8 @@ public sealed record ProductSearchResult(
     EntityId<Product> Id,
     string Name,
     decimal UnitPrice,
-    decimal AvailableStock);
+    decimal AvailableStock,
+    decimal UnitCost = 0m);
 
 public interface IProductSearchReader
 {
