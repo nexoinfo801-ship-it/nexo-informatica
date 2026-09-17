@@ -31,10 +31,12 @@ public sealed class ClienteRuntime : IAsyncDisposable
             var adapter = new SqliteCommerceAdapter(store);
             IFinalizarVenda finalizarVenda = new FinalizarVenda(adapter, adapter);
             ISearchProducts searchProducts = new SearchProducts(adapter);
+            ICreateProduct createProduct = new CreateProduct(adapter);
             var checkout = new SaleCheckoutViewModel(
                 finalizarVenda,
                 searchProducts,
-                new SaleCart());
+                new SaleCart(),
+                createProduct);
             return new ClienteRuntime(store, checkout);
         }
         catch
