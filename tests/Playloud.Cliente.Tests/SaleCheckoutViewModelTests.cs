@@ -43,7 +43,9 @@ public sealed class SaleCheckoutViewModelTests
         var completed = await viewModel.FinalizeAsync(CreateCommand(), cancellationToken);
 
         Assert.False(completed);
-        Assert.Equal("Não foi possível finalizar a venda: Requested quantity exceeds available stock.", viewModel.StatusMessage);
+        Assert.Equal(
+            "Não foi possível finalizar a venda. Verifique os itens, o estoque e a forma de pagamento.",
+            viewModel.StatusMessage);
         Assert.Null(viewModel.LastSaleId);
         Assert.Null(viewModel.LastTotal);
         Assert.False(viewModel.IsBusy);
@@ -60,7 +62,7 @@ public sealed class SaleCheckoutViewModelTests
             viewModel.FinalizeAsync(CreateCommand(), cancellationToken));
 
         Assert.False(viewModel.IsBusy);
-        Assert.Equal("Falha inesperada durante a venda.", viewModel.StatusMessage);
+        Assert.Equal("Ocorreu uma falha inesperada durante a venda.", viewModel.StatusMessage);
     }
 
     private static FinalizarVendaCommand CreateCommand() => new(
