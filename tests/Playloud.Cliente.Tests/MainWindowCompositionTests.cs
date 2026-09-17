@@ -56,6 +56,10 @@ public sealed class MainWindowCompositionTests
                 Assert.NotNull(window.FindName("OperationalHeader"));
                 Assert.NotNull(window.FindName("SalesWorkspace"));
                 Assert.NotNull(window.FindName("CheckoutStatusCard"));
+                Assert.NotNull(window.FindName("ProductSearchBox"));
+                Assert.NotNull(window.FindName("ProductSearchResults"));
+                Assert.NotNull(window.FindName("SaleCartItems"));
+                Assert.NotNull(window.FindName("CartSubtotal"));
 
                 var productTitle = Assert.IsType<TextBlock>(window.FindName("ProductTitle"));
                 Assert.Equal("Playloud PDV & ERP", productTitle.Text);
