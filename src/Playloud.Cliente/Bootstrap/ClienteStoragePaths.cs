@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace Playloud.Cliente.Bootstrap;
 
 public sealed class ClienteStoragePaths
