@@ -1,3 +1,4 @@
+using Playloud.Application.Cash;
 using Playloud.Application.Catalog;
 using Playloud.Application.Sales;
 using Playloud.Domain.Cash;
@@ -128,5 +129,29 @@ public sealed class ApplicationPortAdapterTests : IAsyncLifetime
         Assert.Equal(product.Id, saved.Id);
         Assert.Equal(12m, saved.AvailableStock);
     }
+
+    [Fact]
+    public async Task Active_cash_session_is_opened_once_per_business_date()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var store = new SqliteCommerceStore(_databasePath);
+        await store.InitializeAsync(cancellationToken);
+        var adapter = new SqliteCommerceAdapter(store);
+        IActiveCashSessionStore activeCashStore = adapter;
+        var useCase = new OpenCashSession(activeCashStore);
+        var date = new DateOnly(2026, 9, 17);
+
+        var first = await useCase.ExecuteAsync(
+            new OpenCashSessionCommand(date, 100m),
+            cancellationToken);
+        var second = await useCase.ExecuteAsync(
+            new OpenCashSessionCommand(date, 999m),
+            cancellationToken);
+
+        Assert.Equal(first.Id, second.Id);
+        Assert.Equal(date, second.BusinessDate);
+        Assert.Equal(100m, second.OpeningBalance);
+    }
+
 
 }
