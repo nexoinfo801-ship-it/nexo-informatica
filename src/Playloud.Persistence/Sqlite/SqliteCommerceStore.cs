@@ -29,6 +29,11 @@ public sealed record StoredStockAdjustment(
     string Reason,
     DateTimeOffset CreatedAtUtc);
 
+public sealed record StoredActiveCashSession(
+    EntityId<CashSession> Id,
+    DateOnly BusinessDate,
+    decimal OpeningBalance);
+
 public sealed class SqliteCommerceStore : IAsyncDisposable
 {
     private readonly string _databasePath;
@@ -234,6 +239,89 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
             }
 
             await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<StoredActiveCashSession> OpenOrGetCashSessionAsync(
+        DateOnly businessDate,
+        decimal openingBalance,
+        CancellationToken cancellationToken = default)
+    {
+        if (openingBalance < 0m)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(openingBalance),
+                "Opening balance cannot be negative.");
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+
+        try
+        {
+            StoredActiveCashSession? existing = null;
+            await using (var select = connection.CreateCommand())
+            {
+                select.Transaction = transaction;
+                select.CommandText = """
+                    SELECT id, business_date, opening_balance
+                    FROM cash_sessions
+                    WHERE business_date = $businessDate
+                      AND is_open = 1
+                    ORDER BY rowid
+                    LIMIT 1;
+                    """;
+                select.Parameters.AddWithValue(
+                    "$businessDate",
+                    businessDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+                await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+                if (await reader.ReadAsync(cancellationToken))
+                {
+                    existing = new StoredActiveCashSession(
+                        new EntityId<CashSession>(Guid.Parse(reader.GetString(0))),
+                        DateOnly.ParseExact(
+                            reader.GetString(1),
+                            "yyyy-MM-dd",
+                            CultureInfo.InvariantCulture),
+                        FromStorageDecimal(reader.GetString(2)));
+                }
+            }
+
+            if (existing is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return existing;
+            }
+
+            var session = CashSession.Open(businessDate, openingBalance);
+            await using (var insert = connection.CreateCommand())
+            {
+                insert.Transaction = transaction;
+                insert.CommandText = """
+                    INSERT INTO cash_sessions (id, business_date, opening_balance, is_open)
+                    VALUES ($id, $businessDate, $openingBalance, 1);
+                    """;
+                insert.Parameters.AddWithValue("$id", session.Id.ToString());
+                insert.Parameters.AddWithValue(
+                    "$businessDate",
+                    businessDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                insert.Parameters.AddWithValue(
+                    "$openingBalance",
+                    ToStorageDecimal(openingBalance));
+                await insert.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return new StoredActiveCashSession(
+                session.Id,
+                session.BusinessDate,
+                session.OpeningBalance);
         }
         catch
         {
