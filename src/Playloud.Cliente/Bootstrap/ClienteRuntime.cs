@@ -32,11 +32,15 @@ public sealed class ClienteRuntime : IAsyncDisposable
             IFinalizarVenda finalizarVenda = new FinalizarVenda(adapter, adapter);
             ISearchProducts searchProducts = new SearchProducts(adapter);
             ICreateProduct createProduct = new CreateProduct(adapter);
+            var updateProduct = new UpdateProduct(adapter);
+            var adjustProductStock = new AdjustProductStock(adapter);
             var checkout = new SaleCheckoutViewModel(
                 finalizarVenda,
                 searchProducts,
                 new SaleCart(),
-                createProduct);
+                createProduct,
+                updateProduct,
+                adjustProductStock);
             return new ClienteRuntime(store, checkout);
         }
         catch
