@@ -172,6 +172,24 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
 
         try
         {
+            await using (var duplicateCommand = connection.CreateCommand())
+            {
+                duplicateCommand.Transaction = transaction;
+                duplicateCommand.CommandText = """
+                    SELECT 1
+                    FROM products
+                    WHERE name = $name COLLATE NOCASE
+                    LIMIT 1;
+                    """;
+                duplicateCommand.Parameters.AddWithValue("$name", product.Name);
+
+                if (await duplicateCommand.ExecuteScalarAsync(cancellationToken) is not null)
+                {
+                    throw new InvalidOperationException(
+                        "A product with the same commercial name already exists.");
+                }
+            }
+
             await using (var productCommand = connection.CreateCommand())
             {
                 productCommand.Transaction = transaction;
