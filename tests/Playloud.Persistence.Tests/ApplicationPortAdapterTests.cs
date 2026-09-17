@@ -104,4 +104,29 @@ public sealed class ApplicationPortAdapterTests : IAsyncLifetime
         Assert.Equal(18.90m, result.UnitPrice);
         Assert.Equal(12m, result.AvailableStock);
     }
+
+    [Fact]
+    public async Task Product_writer_persists_catalog_item_and_rejects_duplicate_name()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var store = new SqliteCommerceStore(_databasePath);
+        await store.InitializeAsync(cancellationToken);
+        var adapter = new SqliteCommerceAdapter(store);
+        IProductCatalogWriter writer = adapter;
+
+        var product = Product.Create("Café Especial", 18.90m, 9.40m);
+        await writer.SaveAsync(product, 12m, cancellationToken);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            writer.SaveAsync(
+                Product.Create("café especial", 20m, 10m),
+                5m,
+                cancellationToken));
+
+        var results = await adapter.SearchAsync("café", 20, cancellationToken);
+        var saved = Assert.Single(results);
+        Assert.Equal(product.Id, saved.Id);
+        Assert.Equal(12m, saved.AvailableStock);
+    }
+
 }
