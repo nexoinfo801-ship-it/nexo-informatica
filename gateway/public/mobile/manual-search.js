@@ -1,0 +1,10 @@
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.NexaManualSearch=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
+  'use strict';
+  const SOURCE={current:'manual-client-current',legacy:'manual-client-legacy',master:'manual-master-admin'};
+  function normalize(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9._:+/-]+/g,' ').trim();}
+  function tokens(value){return [...new Set(normalize(value).split(/\s+/).filter(x=>x.length>=2))].slice(0,40);}
+  function selectSource(query){const q=normalize(query);if(/\b(master|admin|nexo license|renew|transfer|status v3|license v3)\b/.test(q))return'master';if(/\b(ui11\.9|lab-rc10|r10 ui11|licenca e suporte|legado|legacy)\b/.test(q))return'legacy';return'current';}
+  function scoreSection(section,queryTokens){const title=normalize(section.title),text=normalize(section.text);let score=0;for(const token of queryTokens){if(title.includes(token))score+=5;if(text.includes(token))score+=1;}if(queryTokens.length&&queryTokens.every(t=>`${title} ${text}`.includes(t)))score+=6;return score+(Number(section.priority)||0)/1000;}
+  function search(pack,query,sourceHint=null,limit=8){if(!pack||!Array.isArray(pack.sections))return[];const selected=SOURCE[sourceHint]||SOURCE[selectSource(query)],qs=tokens(query);let rows=pack.sections.filter(x=>x.sourceId===selected);if(qs.length)rows=rows.map(x=>({...x,score:scoreSection(x,qs)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||String(a.title).localeCompare(String(b.title)));else rows=rows.map(x=>({...x,score:(Number(x.priority)||0)/1000}));return rows.slice(0,Math.max(1,Math.min(20,Number(limit)||8)));}
+  return{normalize,tokens,selectSource,search,SOURCE};
+});
