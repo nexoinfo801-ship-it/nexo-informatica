@@ -5,6 +5,10 @@ RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund
 COPY server.mjs ./server.mjs
 COPY hub.mjs ./hub.mjs
 COPY hub_store.mjs ./hub_store.mjs
+COPY mobile_gateway.mjs ./mobile_gateway.mjs
+COPY mobile_http_api.mjs ./mobile_http_api.mjs
+COPY mobile_store.mjs ./mobile_store.mjs
+COPY mobile_store_postgres.mjs ./mobile_store_postgres.mjs
 COPY public ./public
 COPY test ./test
 RUN npm test
