@@ -1,19 +1,106 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#03101e"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NEXA">
-<link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./app.css"><link rel="stylesheet" href="./mobile-v2.css"><title>NEXA Mobile</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#07131f">
+  <meta name="color-scheme" content="dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="NEXA Mobile">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src https:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <title>NEXA Mobile</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/nexa-icon.svg">
+  <link rel="stylesheet" href="style.css">
 </head>
-<body><div class="app-shell">
-<header class="topbar"><div class="brand"><div class="brand-mark">NEXO</div><div class="brand-sep"></div><div><strong>NEXA Mobile</strong><span>Suporte, operação e decisões no seu iPhone.</span></div></div><div class="top-actions"><div class="outbox-pill" id="outboxPill">Fila <b id="outboxCount">0</b></div><div class="online-pill" id="onlinePill"><i></i><span><b id="onlineText">ONLINE</b><small>Gateway NEXO</small></span></div><button class="profile" data-view="perfil"><span>EV</span><div><b>MASTER</b><small>Este iPhone</small></div></button></div></header>
-<nav class="tabs"><button class="tab active" data-view="inicio">⌂<span>Início</span></button><button class="tab" data-view="chamados">▤<span>Chamados</span><em id="badgeChamados" hidden>0</em></button><button class="tab" data-view="conversa">◯<span>Conversa</span></button><button class="tab" data-view="aprovacoes">✓<span>Aprovações</span><em id="badgeAprovacoes" hidden>0</em></button><button class="tab" data-view="relatorios">▥<span>Relatórios</span></button><button class="tab" data-view="perfil">◎<span>Perfil</span></button></nav>
-<main id="viewInicio">
-<section class="hero"><div class="hero-glow"></div><div class="nexa-reference"><img src="data:image/jpeg;base64,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" alt="NEXA"></div><div class="hero-copy"><p class="eyebrow">NEXA • NEXO COMMUNICATION HUB</p><h1>Central móvel NEXO</h1><h2>Cliente, NEXA e MASTER na mesma linguagem de comunicação.</h2><blockquote>“Receber primeiro. Decidir com evidência. Enviar somente com ação explícita.”</blockquote><div class="hero-benefits"><span>◇ ECDSA P‑256</span><span>▥ Hub 1.1</span><span>↻ Offline-first</span></div></div><div class="device-card"><small>Dispositivo</small><strong> iPhone / PWA</strong><div><i class="ok"></i><span><b id="deviceConnection">Online</b><small id="latencyText">Verificando...</small></span></div><div><i class="ok"></i><span><b id="hubVersion">Hub</b><small>sem execução remota direta</small></span></div></div></section>
-<section class="quick-grid"><button id="diagnosticBtn"><i>⌕</i><b>Diagnóstico</b><span>iPhone + Gateway</span></button><button id="chatBtn"><i>◌</i><b>Falar com a NEXA</b><span>Mensagem assinada</span></button><button id="ticketBtn"><i>▧</i><b>Chamados</b><span>Fila real do Hub</span></button><button id="syncNow"><i>↻</i><b>Atualizar</b><span>Consultar mensagens</span></button></section>
-<div class="columns"><section class="panel"><header><h3>Operação diária</h3><button data-view="chamados">Abrir central ›</button></header><div class="ticket medium"><div class="icon">▤</div><div class="ticket-main"><b>Chamados e diagnósticos</b><strong>Recebidos da NEXA pelo Hub</strong><small>Com origem, correlation_id e hash do payload.</small></div><span class="state diag">HUB 1.1</span></div><div class="ticket low"><div class="icon">◯</div><div class="ticket-main"><b>Conversa</b><strong>Resposta direta ao nó de origem</strong><small>targetNodeId evita resposta para o Cliente errado.</small></div><span class="state done">ECDSA</span></div></section><section class="panel approvals"><header><h3>Aprovações</h3><button data-view="aprovacoes">Ver fila ›</button></header><article class="approval-card"><div class="approval-head"><div class="icon">✓</div><div><b>PRIME_PROPOSAL</b><strong>Decisão explícita do MASTER</strong><small>A decisão é transportada como PRIME_RESULT; o Hub não executa a ação.</small></div></div><div class="tags"><span>remoteMutation: false</span><span>nodeTargeting: true</span></div></article></section></div>
-<section class="system"><header><h3>Status</h3><button id="refreshStatus">Atualizar ›</button></header><div class="status-grid"><div><i>◎</i><span><b>Gateway</b><small id="gatewayStatus">Verificando...</small></span></div><div><i>◇</i><span><b>Criptografia</b><small>● WebCrypto P‑256</small></span></div><div><i>◉</i><span><b>NEXA</b><small>● Canal preparado</small></span></div><div><i>↻</i><span><b>Sincronização</b><small id="syncStatus">● Manual para envio</small></span></div></div></section>
-<section class="security-card"><div>♢</div><span><b>Offline-first de verdade</b><small>Voltar à internet não transmite a fila local automaticamente.</small></span><button id="flushNow">Enviar pendentes</button></section>
-</main>
-<section class="module-view" id="moduleView" hidden><div class="module-top"><button class="back" id="backBtn">‹ Início</button><h2 id="moduleTitle">Módulo</h2></div><div id="moduleBody"></div></section>
-<footer><b>NEXO INFORMÁTICA</b><span>Communication Hub 1.1</span><span>Mobile R12 LAB</span><span>Segurança • Privacidade • Controle</span></footer></div><div class="toast" id="toast" role="status" aria-live="polite"></div><script type="module" src="./mobile-v2.js"></script></body></html>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <div class="avatar-wrap"><img src="assets/nexa-icon.svg" alt="NEXA"></div>
+        <div><small>NEXO • SUPORTE INTELIGENTE</small><h1>NEXA Mobile</h1></div>
+      </div>
+      <button id="connectionPill" class="status-pill" type="button" aria-label="Abrir status"><span class="status-dot"></span><span id="connectionText">OFFLINE</span></button>
+    </header>
+
+    <main class="content">
+      <section class="view active" data-view="chat" id="view-chat">
+        <div class="hero-card">
+          <div><span class="eyebrow">ASSISTENTE NEXO</span><h2>Como posso ajudar?</h2><p>Converse com a NEXA. Online, a pergunta segue para o PRIME. Offline, seus manuais continuam disponíveis.</p></div>
+          <span class="mode-chip" id="chatMode">LOCAL</span>
+        </div>
+        <div class="conversation" id="conversation" aria-live="polite">
+          <article class="message assistant"><div class="message-avatar">N</div><div><b>NEXA</b><p>Estou pronta. Se o HUB não estiver disponível, ainda consigo abrir e pesquisar os manuais salvos neste iPhone.</p></div></article>
+        </div>
+        <form class="composer" id="chatForm">
+          <textarea id="question" maxlength="4000" rows="2" placeholder="Digite sua dúvida sobre o NEXO…" aria-label="Pergunta para a NEXA"></textarea>
+          <button class="send-button" id="sendQuestion" type="submit" aria-label="Enviar pergunta">Enviar</button>
+        </form>
+      </section>
+
+      <section class="view" data-view="manuals" id="view-manuals">
+        <div class="section-head"><div><span class="eyebrow">CONHECIMENTO OFFLINE</span><h2>Manuais NEXO</h2></div><span class="mode-chip">3 FONTES</span></div>
+        <label class="search-field"><span>Buscar</span><input id="manualSearch" type="search" placeholder="Ex.: caixa, ativação, RENEW…" autocomplete="off"></label>
+        <div class="source-tabs" id="manualSources">
+          <button class="source-tab active" type="button" data-source="current">Cliente Atual</button>
+          <button class="source-tab" type="button" data-source="legacy">Cliente Legado</button>
+          <button class="source-tab" type="button" data-source="master">MASTER</button>
+        </div>
+        <div class="manual-results" id="manualResults"><div class="empty-state"><b>Base local pronta</b><span>Pesquise uma função do NEXO mesmo sem internet.</span></div></div>
+      </section>
+
+      <section class="view" data-view="tickets" id="view-tickets">
+        <div class="section-head"><div><span class="eyebrow">ATENDIMENTO</span><h2>Chamados</h2></div><button class="compact-button" id="refreshTickets" type="button">Atualizar</button></div>
+        <div class="notice-card" id="ticketNotice">Para listar ou abrir chamados, conecte o iPhone ao HUB NEXO por HTTPS.</div>
+        <form class="stack-form" id="ticketForm">
+          <label>Assunto<input id="ticketSubject" maxlength="120" placeholder="Resumo do problema"></label>
+          <label>Prioridade<select id="ticketPriority"><option value="P4">Normal</option><option value="P3">Importante</option><option value="P2">Alta</option><option value="P1">Operação parada</option></select></label>
+          <label>Descrição<textarea id="ticketDescription" rows="5" maxlength="4000" placeholder="Descreva o que aconteceu e a mensagem exibida"></textarea></label>
+          <button class="primary-button" type="submit">Abrir chamado</button>
+        </form>
+        <div id="ticketList" class="ticket-list"></div>
+      </section>
+
+      <section class="view" data-view="status" id="view-status">
+        <div class="section-head"><div><span class="eyebrow">CONECTIVIDADE</span><h2>Status</h2></div><button class="compact-button" id="probeHub" type="button">Testar HUB</button></div>
+        <div class="status-grid">
+          <article class="metric-card"><span>Internet</span><strong id="internetStatus">OFFLINE</strong><small>Estado do navegador</small></article>
+          <article class="metric-card"><span>HUB</span><strong id="hubStatus">NÃO CONFIGURADO</strong><small id="hubDetail">HTTPS obrigatório</small></article>
+          <article class="metric-card"><span>Sessão</span><strong id="sessionStatus">NÃO PAREADO</strong><small id="sessionDetail">Sem credencial móvel</small></article>
+          <article class="metric-card"><span>Knowledge</span><strong id="knowledgeStatus">LOCAL</strong><small>Manuais offline R10.24</small></article>
+        </div>
+        <div class="settings-card">
+          <h3>Conexão segura</h3>
+          <label>Gateway HTTPS<input id="gatewayUrl" type="url" inputmode="url" placeholder="https://gateway.exemplo.com"></label>
+          <label>Código de pareamento<textarea id="pairingCode" rows="4" placeholder="Cole o JSON/código temporário gerado pela NEXA"></textarea></label>
+          <div class="button-row"><button class="secondary-button" id="saveGateway" type="button">Salvar gateway</button><button class="primary-button" id="pairDevice" type="button">Parear iPhone</button></div>
+          <button class="danger-link" id="disconnectDevice" type="button">Remover sessão deste iPhone</button>
+        </div>
+      </section>
+
+      <section class="view" data-view="approve" id="view-approve">
+        <div class="section-head"><div><span class="eyebrow">APROVAÇÃO SEGURA</span><h2>Aprovar</h2></div><span class="mode-chip">FAIL-CLOSED</span></div>
+        <div class="approval-card">
+          <div class="shield">✓</div>
+          <h3>Operações críticas não executam pelo celular</h3>
+          <p>O iPhone pode participar da aprovação criptográfica existente, mas a execução final continua condicionada às políticas PRIME, MASTER e confirmação local.</p>
+          <button class="primary-button" id="openApprover" type="button">Abrir Mobile Approver</button>
+          <small>Nenhuma chave MASTER é armazenada no telefone.</small>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Navegação principal">
+      <button class="nav-item active" type="button" data-target="chat"><span>◉</span><b>Conversa</b></button>
+      <button class="nav-item" type="button" data-target="manuals"><span>⌕</span><b>Manuais</b></button>
+      <button class="nav-item" type="button" data-target="tickets"><span>▤</span><b>Chamados</b></button>
+      <button class="nav-item" type="button" data-target="status"><span>●</span><b>Status</b></button>
+      <button class="nav-item" type="button" data-target="approve"><span>✓</span><b>Aprovar</b></button>
+    </nav>
+  </div>
+  <script src="manual-search.js" defer></script>
+  <script src="gateway.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>

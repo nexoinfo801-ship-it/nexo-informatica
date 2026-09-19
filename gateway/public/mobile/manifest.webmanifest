@@ -1,10 +1,20 @@
 {
-  "name":"NEXA Mobile",
-  "short_name":"NEXA",
-  "start_url":"./",
-  "scope":"./",
-  "display":"standalone",
-  "background_color":"#020b14",
-  "theme_color":"#03101e",
-  "description":"NEXA Mobile — suporte inteligente, chamados e aprovações seguras do ecossistema NEXO."
+  "name": "NEXA Mobile — NEXO Support",
+  "short_name": "NEXA",
+  "description": "Companion iOS/PWA da NEXA para suporte, manuais, chamados e status do ecossistema NEXO.",
+  "lang": "pt-BR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#06101b",
+  "theme_color": "#07131f",
+  "icons": [
+    {
+      "src": "assets/nexa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
