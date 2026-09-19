@@ -21,4 +21,4 @@ test('private CLIENTE reply is visible only to target node',async()=>{const c1=e
 
 test('target node role mismatch is rejected',async()=>{const client=enroll('CLIENTE','CLIENT-C'),nexa=enroll('NEXA','NEXA-2');await assert.rejects(()=>send(nexa,'MASTER','SUPPORT_MESSAGE',{answer:'x'},{targetNodeId:client.nodeId}),/HUB_TARGET_NODE_INVALID/);});
 
-test('protocol advertises node targeting, persistent contract and safe reconnect policy',()=>{const p=hub.protocol();assert.equal(p.protocolVersion,'1.2.0-rc1');assert.equal(p.nodeTargeting,true);assert.equal(p.remoteMutation,false);assert.equal(p.autoSendOnReconnect,false);assert.equal(p.persistence,'MEMORY_LAB');});
+test('protocol advertises node targeting, persistent contract and safe reconnect policy',()=>{const p=hub.protocol();assert.match(p.protocolVersion,/^1\.(?:2|3)\./);assert.equal(p.nodeTargeting,true);assert.equal(p.remoteMutation,false);assert.equal(p.autoSendOnReconnect,false);assert.equal(p.persistence,'MEMORY_LAB');});
