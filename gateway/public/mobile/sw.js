@@ -1,6 +1,6 @@
 'use strict';
-const CACHE_NAME='nexa-mobile-r10-26-hosted-v1';
-const ASSETS=['./','./index.html','./app.css','./manual-search.js','./gateway.js','./app.js','./manifest.webmanifest','./manuals.json','./icon.svg'];
+const CACHE_NAME='nexa-mobile-r10-26-hosted-v2';
+const ASSETS=['./','./index.html','./app.css','./manual-search.js','./gateway.js','./app.js','./manifest.webmanifest','./manuals-index.json','./manuals-01.json','./manuals-02.json','./manuals-03.json','./manuals-04.json','./manuals-05.json','./manuals-06.json','./manuals-07.json','./manuals-08.json','./icon.svg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const url=new URL(event.request.url);if(url.origin!==self.location.origin)return;event.respondWith(caches.match(event.request).then(hit=>hit||fetch(event.request).then(response=>{if(response.ok&&['document','script','style','image','manifest'].includes(event.request.destination)){const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put(event.request,copy));}return response;}).catch(()=>caches.match('./index.html'))));});
