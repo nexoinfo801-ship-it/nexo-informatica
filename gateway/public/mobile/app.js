@@ -1,102 +1,33 @@
-const qs=(s)=>document.querySelector(s), qsa=(s)=>[...document.querySelectorAll(s)];
-const toast=qs('#toast');
-function showToast(text){toast.textContent=text;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2200)}
-function networkRender(){
-  const online=navigator.onLine;
-  qs('#onlineText').textContent=online?'ONLINE':'OFFLINE';
-  qs('#onlinePill').classList.toggle('offline',!online);
-  qs('#deviceConnection').textContent=online?'Online':'Offline';
-  qs('#syncStatus').textContent=online?'● Normal':'● Fila local';
-}
-window.addEventListener('online',()=>{networkRender();showToast('Conexão restaurada. Nenhum conteúdo foi enviado automaticamente.')});
-window.addEventListener('offline',()=>{networkRender();showToast('Modo offline ativo. O NEXO continuará usando a fila local.')});
-networkRender();
-
-const DEFAULT_GATEWAY = location.protocol.startsWith('http')
-  ? location.origin
-  : 'https://gateway.nexo.sideproject.cyou';
-
-async function checkGateway(){
-  const start=performance.now();
-  try{
-    const r=await fetch(DEFAULT_GATEWAY+'/health',{cache:'no-store',signal:AbortSignal.timeout(4500)});
-    if(!r.ok) throw new Error('health');
-    const data=await r.json();
-    const ms=Math.round(performance.now()-start);
-    qs('#gatewayStatus').textContent='● Online';
-    qs('#latencyText').textContent='Latência: '+ms+' ms';
-    qs('#deviceConnection').textContent='Online';
-    return data;
-  }catch{
-    qs('#gatewayStatus').textContent='● Gateway indisponível';
-    qs('#latencyText').textContent='Sem resposta do Gateway';
-    return null;
-  }
-}
-
-async function loadBootstrap(){
-  try{
-    const r=await fetch(DEFAULT_GATEWAY+'/v1/bootstrap',{cache:'no-store',signal:AbortSignal.timeout(4500)});
-    if(!r.ok) return null;
-    const data=await r.json();
-    if(!data?.ok || data?.envelope?.algorithm!=='ES256') return null;
-    sessionStorage.setItem('nexo.bootstrap',JSON.stringify(data.envelope));
-    return data.envelope;
-  }catch{return null}
-}
-
-Promise.all([checkGateway(),loadBootstrap()]).then(([health,bootstrap])=>{
-  if(health && bootstrap) showToast('Gateway e bootstrap seguro carregados.');
-});
-qs('#refreshStatus').addEventListener('click',async()=>{
-  await Promise.all([checkGateway(),loadBootstrap()]);
-  showToast('Status atualizado.');
-});
-
-const views={
-  chamados:['Chamados','Fila de chamados integrada ao TICKET_ID do NEXO.'],
-  conversa:['Conversa com a NEXA','A conversa real será ligada ao Remote Relay mantendo histórico e consentimento de envio.'],
-  aprovacoes:['Aprovações','Challenges assinados ECDSA P-256 serão exibidos aqui.'],
-  relatorios:['Relatórios','Relatórios técnicos e evidências de homologação serão exibidos aqui.'],
-  perfil:['Perfil MASTER','Dispositivo, enrollment, chaves públicas e estado de autorização.']
-};
-qsa('.tab').forEach(btn=>btn.addEventListener('click',()=>{
-  qsa('.tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');
-  const v=btn.dataset.view;
-  if(v==='inicio'){qs('#viewInicio').hidden=false;qs('#secondaryView').hidden=true;return}
-  qs('#viewInicio').hidden=true;qs('#secondaryView').hidden=false;
-  qs('#secondaryTitle').textContent=views[v][0];qs('#secondaryText').textContent=views[v][1];
-}));
-qs('#backBtn').addEventListener('click',()=>qsa('.tab')[0].click());
-
-qsa('.quick-grid button').forEach(b=>b.addEventListener('click',()=>showToast({
-  diagnostico:'Diagnóstico sanitizado preparado para integração.',
-  conversa:'Abrindo conversa NEXA...',
-  'novo-chamado':'Novo chamado será vinculado a um TICKET_ID.',
-  qr:'Leitor QR será habilitado no fluxo de enrollment.'
-}[b.dataset.action]||'Ação preparada.')));
-
-function b64u(bytes){let s='';for(const b of new Uint8Array(bytes))s+=String.fromCharCode(b);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
-function stableObj(v){if(Array.isArray(v))return v.map(stableObj);if(v&&typeof v==='object')return Object.fromEntries(Object.keys(v).sort().map(k=>[k,stableObj(v[k])]));return v}
-function canonical(v){return JSON.stringify(stableObj(v))}
-function openDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open('nexo-ios-r11',1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('keys'))r.result.createObjectStore('keys')};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
-async function dbSet(k,v){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction('keys','readwrite');tx.objectStore('keys').put(v,k);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
-async function dbGet(k){const db=await openDb();return new Promise((resolve,reject)=>{const r=db.transaction('keys').objectStore('keys').get(k);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
-function runIosCheck(){const ua=navigator.userAgent;qs('#iosCheck').textContent=/iPhone|iPad|iPod/.test(ua)?'● iOS detectado':'● Navegador não-iOS';qs('#cryptoCheck').textContent=globalThis.crypto?.subtle?'● Disponível':'● Indisponível';const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;qs('#pwaCheck').textContent=standalone?'● Standalone':'● Safari / não instalado'}
-qs('#runIosCheck')?.addEventListener('click',()=>{runIosCheck();showToast('Diagnóstico iPhone atualizado.')});runIosCheck();
-async function ensureDeviceKeyPair(){let record=await dbGet('deviceKeyPair');if(record?.privateKey&&record?.publicKey)return record;const kp=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);record={privateKey:kp.privateKey,publicKey:kp.publicKey};await dbSet('deviceKeyPair',record);return record}
-async function postJson(path,body={}){const r=await fetch(DEFAULT_GATEWAY+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('HTTP_'+r.status));return d}
-async function enrollIphone(){try{qs('#enrollCheck').textContent='Gerando chave...';const kp=await ensureDeviceKeyPair();const publicJwk=await crypto.subtle.exportKey('jwk',kp.publicKey);const c=(await postJson('/v1/mobile/lab/enroll/challenge')).challenge;const payload={schema:'NEXO_MOBILE_ENROLLMENT_V1',challengeId:c.challengeId,deviceId:c.deviceId,nonce:c.nonce,publicJwk};const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},kp.privateKey,new TextEncoder().encode(canonical(payload)));await postJson('/v1/mobile/lab/enroll/complete',{...payload,signature:b64u(sig)});localStorage.setItem('nexo.deviceId',c.deviceId);qs('#enrollCheck').textContent='● Ativo';showToast('iPhone enrollado no LAB com ECDSA P-256.')}catch(e){qs('#enrollCheck').textContent='● '+e.message;showToast('Enrollment não concluído: '+e.message)}}
-qs('#enrollBtn')?.addEventListener('click',enrollIphone);
-async function fieldApprove(){try{const deviceId=localStorage.getItem('nexo.deviceId');if(!deviceId)throw new Error('IPHONE_NOT_ENROLLED');const kp=await ensureDeviceKeyPair();const c=(await postJson('/v1/mobile/lab/challenge',{deviceId,action:'APPROVE'})).challenge;const payload={schema:c.schema,ticketId:c.ticketId,challengeId:c.challengeId,correlationId:c.correlationId,deviceId:c.deviceId,audience:c.audience,action:c.action,risk:c.risk,nonce:c.nonce,issuedAt:c.issuedAt,expiresAt:c.expiresAt,payloadHash:c.payloadHash};const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},kp.privateKey,new TextEncoder().encode(canonical(payload)));const out=await postJson('/v1/mobile/lab/decision',{...payload,signature:b64u(sig)});showToast('APPROVE assinado e aceito: '+out.ack.challengeId.slice(0,8)+'…')}catch(e){showToast('Teste APPROVE falhou: '+e.message)}}
-qs('#fieldApproveBtn')?.addEventListener('click',fieldApprove);
-qs('#approveBtn').addEventListener('click',fieldApprove);
-qs('#denyBtn').addEventListener('click',()=>showToast('DENY será ligado ao próximo challenge do MASTER.'));
-
-if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
-
-qsa('.daily-grid button').forEach(b=>b.addEventListener('click',()=>{
- const a=b.dataset.action;
- const map={clientes:'Clientes conectados serão carregados pela Central NEXO.',chamados:'Abrindo acompanhamento de chamados.',remoto:'Acesso remoto exige autorização explícita do cliente.',nexa:'NEXA pronta para orientar o atendimento.'};
- showToast(map[a]||'Ação preparada.');
-}));
+'use strict';
+const q=s=>document.querySelector(s),qa=s=>[...document.querySelectorAll(s)];
+const state={manualPack:null,manualSource:'current',gateway:null,session:null,lastMessageSequence:0,polling:false};
+const STORE_GATEWAY='nexa.mobile.r10_26.gateway',STORE_DEVICE='nexa.mobile.r10_26.device',STORE_SESSION='nexa.mobile.r10_26.session',STORE_SEQUENCE='nexa.mobile.r10_26.sequence';
+const DEFAULT_GATEWAY='https://gateway.nexo.sideproject.cyou';
+function showView(name){qa('.view').forEach(x=>x.classList.toggle('active',x.dataset.view===name));qa('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.target===name));}
+qa('.nav-item').forEach(btn=>btn.addEventListener('click',()=>showView(btn.dataset.target)));q('#connectionPill')?.addEventListener('click',()=>showView('status'));
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+function esc(value){return String(value||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function safeGet(storage,key){try{return JSON.parse(storage.getItem(key)||'null')}catch{return null}}
+function safeSet(storage,key,value){try{storage.setItem(key,JSON.stringify(value));return true}catch{return false}}
+function deviceId(){let id=localStorage.getItem(STORE_DEVICE);if(!id){id=`IOS-${crypto.randomUUID()}`;localStorage.setItem(STORE_DEVICE,id);}return id;}
+function buildGateway(){const url=localStorage.getItem(STORE_GATEWAY)||DEFAULT_GATEWAY;if(!localStorage.getItem(STORE_GATEWAY))localStorage.setItem(STORE_GATEWAY,url);q('#gatewayUrl').value=url;const saved=safeGet(sessionStorage,STORE_SESSION);if(!url||!window.NexaMobileGateway){state.gateway=null;state.session=null;return;}try{state.gateway=new NexaMobileGateway.GatewayClient({baseUrl:url,session:saved||undefined});state.session=saved||null;}catch{state.gateway=null;state.session=null;}}
+function updateNetwork(){const online=navigator.onLine;q('#internetStatus').textContent=online?'ONLINE':'OFFLINE';const connected=online&&state.gateway&&state.gateway.sessionToken;q('#connectionText').textContent=connected?'HUB':(online?'ONLINE':'OFFLINE');q('#chatMode').textContent=connected?'PRIME':'LOCAL';q('#sessionStatus').textContent=state.gateway?.sessionToken?'PAREADO':'NÃO PAREADO';q('#sessionDetail').textContent=state.gateway?.sessionToken?`Expira ${new Date(state.gateway.expiresAt).toLocaleString()}`:'Sem credencial móvel';if(!state.gateway){q('#hubStatus').textContent='NÃO CONFIGURADO';q('#hubDetail').textContent='HTTPS obrigatório';}}
+window.addEventListener('online',updateNetwork);window.addEventListener('offline',updateNetwork);
+function renderManuals(){const host=q('#manualResults'),query=q('#manualSearch').value.trim();if(!state.manualPack||!window.NexaManualSearch){host.innerHTML='<div class="empty-state"><b>Base local indisponível</b><span>Reabra a NEXA Mobile após a primeira carga online.</span></div>';return;}const rows=NexaManualSearch.search(state.manualPack,query,state.manualSource,10);if(!rows.length){host.innerHTML='<div class="empty-state"><b>Nenhum resultado</b><span>Tente outro termo ou outra versão do manual.</span></div>';return;}host.innerHTML=rows.map(r=>`<article class="manual-card"><h3>${esc(r.title)}</h3><p>${esc(String(r.text||'').slice(0,720))}</p><div class="manual-meta"><span>${esc(r.sourceRole)}</span><span>${esc(r.sourceStatus)}</span></div></article>`).join('');}
+async function loadManuals(){try{const res=await fetch('./manuals.json',{cache:'no-cache'});if(!res.ok)throw new Error('manual pack');state.manualPack=await res.json();renderManuals();}catch{renderManuals();}}
+q('#manualSearch')?.addEventListener('input',renderManuals);qa('.source-tab').forEach(btn=>btn.addEventListener('click',()=>{state.manualSource=btn.dataset.source;qa('.source-tab').forEach(x=>x.classList.toggle('active',x===btn));renderManuals();}));
+function appendMessage(role,text,label){const host=q('#conversation'),article=document.createElement('article');article.className=`message ${role}`;if(role==='assistant'){const avatar=document.createElement('div');avatar.className='message-avatar';avatar.textContent='N';article.appendChild(avatar);}const box=document.createElement('div'),b=document.createElement('b'),p=document.createElement('p');b.textContent=label||(role==='assistant'?'NEXA':'VOCÊ');p.textContent=String(text||'');box.append(b,p);article.appendChild(box);host.appendChild(article);host.scrollTop=host.scrollHeight;return article;}
+function localManualAnswer(question){if(!state.manualPack||!window.NexaManualSearch)return'Estou offline e a base local de manuais ainda não foi carregada neste iPhone.';const source=NexaManualSearch.selectSource(question),rows=NexaManualSearch.search(state.manualPack,question,source,3);if(!rows.length)return'Estou offline. Não encontrei essa informação nos manuais locais. Quando o HUB estiver disponível, posso consultar o PRIME e ampliar a investigação.';const r=rows[0],excerpt=String(r.text||'').trim().slice(0,1200);return`Consulta local — ${r.title}\n\n${excerpt}\n\nFonte: ${r.sourceRole}. Para diagnóstico do estado real do Cliente, conecte o HUB.`;}
+q('#chatForm')?.addEventListener('submit',async event=>{event.preventDefault();const field=q('#question'),question=field.value.trim();if(!question)return;appendMessage('user',question);field.value='';const pending=appendMessage('assistant','Preparando atendimento…','NEXA');try{if(navigator.onLine&&state.gateway?.hasScope('support:ask')){const out=await state.gateway.ask(question,{channel:'IOS_PWA',manualPack:'R10.24_MANUALS',clientBuild:'R10.26'});const protocol=String(out?.request?.protocol||out?.protocol||'').trim();pending.querySelector('p').textContent=`Enviado à NEXA • aguardando a NEXA processar${protocol?` • ${protocol}`:''}. A resposta aparecerá aqui quando a NEXA Windows processar a solicitação.`;pending.dataset.pending='true';pending.dataset.correlationId=String(out?.request?.correlationId||out?.correlationId||'');await pollMobileMessages();}else pending.querySelector('p').textContent=localManualAnswer(question);}catch(e){pending.querySelector('p').textContent=`Não consegui consultar o HUB agora (${e.message}).\n\n${localManualAnswer(question)}`;}});
+async function pollMobileMessages(){if(state.polling||!navigator.onLine||!state.gateway?.hasScope('support:ask'))return;state.polling=true;try{const out=await state.gateway.pollMessages(state.lastMessageSequence);const messages=Array.isArray(out?.messages)?out.messages:[];const ack=[];for(const item of messages){const env=item?.envelope||item;if(!env)continue;const seq=Number(item?.sequence||0);if(seq>state.lastMessageSequence)state.lastMessageSequence=seq;const message=String(env?.payload?.message||env?.payload?.summary||'').trim();if(message){appendMessage('assistant',message,'NEXA • HUB');if(env.messageId)ack.push(env.messageId);}}if(ack.length)await state.gateway.ackMessages(ack);try{sessionStorage.setItem(STORE_SEQUENCE,String(state.lastMessageSequence));}catch{}}catch(e){if(e?.status===401){sessionStorage.removeItem(STORE_SESSION);state.gateway?.clearSession();state.session=null;updateNetwork();}}finally{state.polling=false;}}
+function startMessagePolling(){try{state.lastMessageSequence=Math.max(0,Number(sessionStorage.getItem(STORE_SEQUENCE)||0));}catch{}setInterval(()=>{if(document.visibilityState==='visible')pollMobileMessages();},10000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pollMobileMessages();});}
+function renderTickets(tickets){const host=q('#ticketList');host.innerHTML='';for(const t of Array.isArray(tickets)?tickets:[]){const card=document.createElement('article');card.className='ticket-card';const h=document.createElement('h3'),p=document.createElement('p');h.textContent=`${t.protocol||t.id||'Chamado'} • ${t.subject||'Sem assunto'}`;p.textContent=`${t.status||'Status indisponível'}${t.priority?` • ${t.priority}`:''}`;card.append(h,p);host.appendChild(card);}if(!host.childElementCount)host.innerHTML='<div class="empty-state"><b>Nenhum chamado</b><span>Não há chamados disponíveis para esta sessão.</span></div>';}
+async function refreshTickets(){if(!navigator.onLine||!state.gateway?.hasScope('tickets:read')){q('#ticketNotice').textContent='Chamados exigem sessão HUB ativa. Nada será enviado automaticamente quando a conexão voltar.';return;}q('#ticketNotice').textContent='Consultando chamados…';try{const out=await state.gateway.listTickets();renderTickets(out.tickets);q('#ticketNotice').textContent='Chamados sincronizados sob demanda.';}catch(e){q('#ticketNotice').textContent=`Não foi possível consultar chamados: ${e.message}`;}}
+q('#refreshTickets')?.addEventListener('click',refreshTickets);
+q('#ticketForm')?.addEventListener('submit',async event=>{event.preventDefault();if(!navigator.onLine||!state.gateway?.hasScope('tickets:create')){q('#ticketNotice').textContent='Não enviado: conecte e pareie o HUB. Este chamado não será enfileirado para envio automático.';return;}const ticket={subject:q('#ticketSubject').value.trim(),description:q('#ticketDescription').value.trim(),priority:q('#ticketPriority').value};q('#ticketNotice').textContent='Enviando chamado…';try{const out=await state.gateway.createTicket(ticket);q('#ticketNotice').textContent=`Chamado ${out.ticket?.protocol||''} aberto com sucesso.`.trim();q('#ticketSubject').value='';q('#ticketDescription').value='';await refreshTickets();}catch(e){q('#ticketNotice').textContent=`Chamado não enviado: ${e.message}`;}});
+q('#saveGateway')?.addEventListener('click',()=>{try{const url=NexaMobileGateway.validateGatewayUrl(q('#gatewayUrl').value);localStorage.setItem(STORE_GATEWAY,url);buildGateway();updateNetwork();q('#hubStatus').textContent='CONFIGURADO';q('#hubDetail').textContent=url;}catch(e){alert(e.message)}});
+q('#probeHub')?.addEventListener('click',async()=>{if(!state.gateway)return alert('Configure primeiro um gateway HTTPS.');q('#hubStatus').textContent='TESTANDO';try{const out=await state.gateway.probe();q('#hubStatus').textContent='COMPATÍVEL';q('#hubDetail').textContent=out.protocol.protocolVersion||'Protocolo válido';if(state.gateway.hasScope('status:read')){const remote=await state.gateway.status();const rs=remote.status||remote;const hub=rs.hub||{};q('#hubDetail').textContent=`${out.protocol.protocolVersion||'protocolo'} • HUB ${hub.ready?'pronto':'atenção'} • persistência ${hub.persistence||'n/d'} • sessão ${rs.session?.active?'PAREADO':'n/d'}`;}}catch(e){q('#hubStatus').textContent='INDISPONÍVEL';q('#hubDetail').textContent=e.message;}});
+q('#pairDevice')?.addEventListener('click',async()=>{if(!state.gateway)return alert('Configure primeiro um gateway HTTPS.');let pairing;try{pairing=JSON.parse(q('#pairingCode').value.trim());}catch{return alert('Código de pareamento inválido. Cole o JSON temporário gerado pela NEXA.');}q('#sessionStatus').textContent='PAREANDO';try{const session=await state.gateway.claimPairing(pairing,{deviceId:deviceId(),label:'iPhone NEXA'});safeSet(sessionStorage,STORE_SESSION,session);state.session=session;q('#pairingCode').value='';q('#sessionStatus').textContent='PAREADO';q('#sessionDetail').textContent=`Expira ${new Date(session.expiresAt).toLocaleString()}`;updateNetwork();}catch(e){q('#sessionStatus').textContent='FALHA';q('#sessionDetail').textContent=e.message;}});
+q('#disconnectDevice')?.addEventListener('click',()=>{sessionStorage.removeItem(STORE_SESSION);sessionStorage.removeItem(STORE_SEQUENCE);state.gateway?.clearSession();state.session=null;state.lastMessageSequence=0;updateNetwork();});
+q('#openApprover')?.addEventListener('click',()=>{alert('Aprovações críticas permanecem no canal Mobile Approver separado. O Companion R10.26 não executa ação crítica remotamente.');});
+buildGateway();updateNetwork();loadManuals();startMessagePolling();pollMobileMessages();
