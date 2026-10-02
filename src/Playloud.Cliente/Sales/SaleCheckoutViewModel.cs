@@ -33,6 +33,7 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     private readonly UpdateProduct _updateProduct;
     private readonly AdjustProductStock _adjustProductStock;
     private readonly IOpenCashSession _openCashSession;
+    private readonly ICloseCashSession _closeCashSession;
     private readonly DateOnly _businessDate;
     private bool _isBusy;
     private string _statusMessage = "Pronto para vender.";
@@ -52,6 +53,8 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     private decimal? _lastTotal;
     private ActiveCashSession? _activeCashSession;
     private decimal _openingBalance;
+    private decimal _actualCash;
+    private CashClosing? _lastCashClosing;
     private PaymentMethodOption _selectedPaymentMethod = AvailablePaymentMethods[0];
     private decimal _amountReceived;
     private decimal _lastChangeDue;
@@ -130,6 +133,29 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
         AdjustProductStock adjustProductStock,
         IOpenCashSession openCashSession,
         TimeProvider timeProvider)
+        : this(
+            finalizarVenda,
+            searchProducts,
+            cart,
+            createProduct,
+            updateProduct,
+            adjustProductStock,
+            openCashSession,
+            timeProvider,
+            new UnavailableCloseCashSession())
+    {
+    }
+
+    public SaleCheckoutViewModel(
+        IFinalizarVenda finalizarVenda,
+        ISearchProducts searchProducts,
+        SaleCart cart,
+        ICreateProduct createProduct,
+        UpdateProduct updateProduct,
+        AdjustProductStock adjustProductStock,
+        IOpenCashSession openCashSession,
+        TimeProvider timeProvider,
+        ICloseCashSession closeCashSession)
     {
         _finalizarVenda = finalizarVenda ?? throw new ArgumentNullException(nameof(finalizarVenda));
         _searchProducts = searchProducts ?? throw new ArgumentNullException(nameof(searchProducts));
@@ -140,6 +166,8 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
             adjustProductStock ?? throw new ArgumentNullException(nameof(adjustProductStock));
         _openCashSession =
             openCashSession ?? throw new ArgumentNullException(nameof(openCashSession));
+        _closeCashSession =
+            closeCashSession ?? throw new ArgumentNullException(nameof(closeCashSession));
         ArgumentNullException.ThrowIfNull(timeProvider);
         _businessDate = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
 
@@ -148,6 +176,7 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
         UpdateProductCommand = new AsyncRelayCommand(() => UpdateManagedProductAsync());
         AdjustStockCommand = new AsyncRelayCommand(() => AdjustManagedStockAsync());
         OpenCashCommand = new AsyncRelayCommand(() => OpenCashSessionAsync());
+        CloseCashCommand = new AsyncRelayCommand(() => CloseCashSessionAsync());
         FinalizeCurrentSaleCommand = new AsyncRelayCommand(() => FinalizeCurrentSaleAsync());
         SelectProductCommand = new RelayCommand(parameter =>
         {
@@ -201,6 +230,8 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     public ICommand AdjustStockCommand { get; }
 
     public ICommand OpenCashCommand { get; }
+
+    public ICommand CloseCashCommand { get; }
 
     public ICommand FinalizeCurrentSaleCommand { get; }
 
@@ -309,6 +340,18 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
     }
 
     public bool HasOpenCashSession => _activeCashSession is not null;
+
+    public decimal ActualCash
+    {
+        get => _actualCash;
+        set => SetField(ref _actualCash, value);
+    }
+
+    public CashClosing? LastCashClosing
+    {
+        get => _lastCashClosing;
+        private set => SetField(ref _lastCashClosing, value);
+    }
 
     public PaymentMethodOption SelectedPaymentMethod
     {
@@ -646,6 +689,57 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
         }
     }
 
+    public async Task<bool> CloseCashSessionAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_activeCashSession is not ActiveCashSession session)
+        {
+            StatusMessage = "Não há caixa aberto para fechar.";
+            return false;
+        }
+
+        if (ActualCash < 0m)
+        {
+            StatusMessage = "O valor contado não pode ser negativo.";
+            return false;
+        }
+
+        IsBusy = true;
+        StatusMessage = "Fechando caixa...";
+
+        try
+        {
+            var closing = await _closeCashSession.ExecuteAsync(
+                new CloseCashSessionCommand(session.Id, ActualCash),
+                cancellationToken);
+
+            LastCashClosing = closing;
+            _activeCashSession = null;
+            OnPropertyChanged(nameof(HasOpenCashSession));
+            StatusMessage = $"Caixa fechado. Diferença: {closing.Difference:N2}.";
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            StatusMessage = "O valor contado não pode ser negativo.";
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            StatusMessage = "Não foi possível fechar o caixa. Atualize o saldo e tente novamente.";
+            return false;
+        }
+        catch
+        {
+            StatusMessage = "Ocorreu uma falha inesperada durante o fechamento do caixa.";
+            throw;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     public async Task<bool> FinalizeCurrentSaleAsync(
         CancellationToken cancellationToken = default)
     {
@@ -771,6 +865,14 @@ public sealed class SaleCheckoutViewModel : INotifyPropertyChanged
             OpenCashSessionCommand command,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("Cash opening is not configured.");
+    }
+
+    private sealed class UnavailableCloseCashSession : ICloseCashSession
+    {
+        public Task<CashClosing> ExecuteAsync(
+            CloseCashSessionCommand command,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("Cash closing is not configured.");
     }
 
     private sealed class EmptyProductCatalogManager : IProductCatalogManager
