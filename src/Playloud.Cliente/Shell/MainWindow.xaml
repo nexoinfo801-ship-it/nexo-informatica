@@ -724,6 +724,73 @@
                         </Border>
                     </Expander>
 
+                    <Expander x:Name="CashClosingPanel"
+                              Margin="0,18,0,0"
+                              Background="#0C141F"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              IsExpanded="False">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE7E8;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           Foreground="#79B4FF"
+                                           Margin="0,0,9,0" />
+                                <TextBlock Text="FECHAMENTO DO CAIXA"
+                                           Style="{StaticResource SectionLabel}" />
+                            </StackPanel>
+                        </Expander.Header>
+                        <Border BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="16"
+                                Margin="0,10,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Informe o dinheiro contado fisicamente antes de fechar o caixa."
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="11"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="Valor contado"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           FontSize="11"
+                                           Margin="0,12,0,5" />
+                                <TextBox x:Name="ActualCashBox"
+                                         Text="{Binding ActualCash, UpdateSourceTrigger=LostFocus, StringFormat=N2}"
+                                         Background="#091019"
+                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                         CaretBrush="White"
+                                         BorderBrush="#2B3D53"
+                                         Padding="9,7" />
+                                <Grid Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="ÚLTIMA DIFERENÇA"
+                                                   Style="{StaticResource SectionLabel}" />
+                                        <TextBlock x:Name="ClosingDifference"
+                                                   Text="{Binding LastCashClosing.Difference, StringFormat={}{0:N2}}"
+                                                   Foreground="#79B4FF"
+                                                   FontSize="18"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,3,0,0" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1"
+                                               Text="R$"
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               FontSize="11"
+                                               VerticalAlignment="Bottom"
+                                               Margin="0,0,0,3" />
+                                </Grid>
+                                <Button x:Name="CloseCashButton"
+                                        Content="Fechar caixa"
+                                        Command="{Binding CloseCashCommand}"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Margin="0,14,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+
                     <Border x:Name="PaymentPanel"
                             Margin="0,18,0,0"
                             Background="#0C141F"
