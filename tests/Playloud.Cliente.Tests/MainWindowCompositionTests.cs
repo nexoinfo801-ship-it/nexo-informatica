@@ -68,6 +68,10 @@ public sealed class MainWindowCompositionTests
                 Assert.NotNull(window.FindName("AdjustStockButton"));
                 Assert.NotNull(window.FindName("CashOpeningPanel"));
                 Assert.NotNull(window.FindName("OpenCashButton"));
+                Assert.NotNull(window.FindName("CashClosingPanel"));
+                Assert.NotNull(window.FindName("ActualCashBox"));
+                Assert.NotNull(window.FindName("CloseCashButton"));
+                Assert.NotNull(window.FindName("ClosingDifference"));
                 Assert.NotNull(window.FindName("PaymentMethodSelector"));
                 Assert.NotNull(window.FindName("AmountReceivedBox"));
                 Assert.NotNull(window.FindName("FinalizeSaleButton"));
