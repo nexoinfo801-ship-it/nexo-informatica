@@ -464,6 +464,86 @@ public sealed class SqliteCommerceStore : IAsyncDisposable
         return result;
     }
 
+    public async Task<CashClosing> CloseCashSessionAsync(
+        EntityId<CashSession> cashSessionId,
+        decimal actualCash,
+        CancellationToken cancellationToken = default)
+    {
+        if (actualCash < 0m)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(actualCash),
+                "Actual cash cannot be negative.");
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction(deferred: false);
+
+        try
+        {
+            var session = await ReadCashSessionAsync(
+                connection,
+                transaction,
+                cashSessionId,
+                cancellationToken);
+
+            if (!session.IsOpen)
+            {
+                throw new InvalidOperationException("Cash session is already closed.");
+            }
+
+            var expectedCash = await ReadExpectedCashBalanceAsync(
+                connection,
+                transaction,
+                cashSessionId,
+                cancellationToken);
+            var closing = new CashClosing(
+                expectedCash,
+                actualCash,
+                actualCash - expectedCash);
+
+            await using (var insert = connection.CreateCommand())
+            {
+                insert.Transaction = transaction;
+                insert.CommandText = """
+                    INSERT INTO cash_closings (
+                        cash_session_id, expected_cash, actual_cash, difference)
+                    VALUES (
+                        $cashSessionId, $expectedCash, $actualCash, $difference);
+                    """;
+                insert.Parameters.AddWithValue("$cashSessionId", cashSessionId.ToString());
+                insert.Parameters.AddWithValue("$expectedCash", ToStorageDecimal(closing.ExpectedCash));
+                insert.Parameters.AddWithValue("$actualCash", ToStorageDecimal(closing.ActualCash));
+                insert.Parameters.AddWithValue("$difference", ToStorageDecimal(closing.Difference));
+                await insert.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await using (var update = connection.CreateCommand())
+            {
+                update.Transaction = transaction;
+                update.CommandText = """
+                    UPDATE cash_sessions
+                    SET is_open = 0
+                    WHERE id = $id AND is_open = 1;
+                    """;
+                update.Parameters.AddWithValue("$id", cashSessionId.ToString());
+                var affected = await update.ExecuteNonQueryAsync(cancellationToken);
+                if (affected != 1)
+                {
+                    throw new InvalidOperationException("Cash session could not be closed.");
+                }
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return closing;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
     public async Task CloseCashSessionAsync(
         EntityId<CashSession> cashSessionId,
         CashClosing closing,

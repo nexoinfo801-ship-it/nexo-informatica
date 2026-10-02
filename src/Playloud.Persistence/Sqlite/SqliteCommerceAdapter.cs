@@ -9,7 +9,7 @@ using Playloud.Domain.Sales;
 namespace Playloud.Persistence.Sqlite;
 
 public sealed class SqliteCommerceAdapter(
-    SqliteCommerceStore store) : IProductSnapshotReader, IProductSearchReader, IProductCatalogWriter, IProductCatalogManager, IProductStockAdjuster, ISaleCommitter, IActiveCashSessionStore
+    SqliteCommerceStore store) : IProductSnapshotReader, IProductSearchReader, IProductCatalogWriter, IProductCatalogManager, IProductStockAdjuster, ISaleCommitter, IActiveCashSessionStore, ICashSessionCloser
 {
     private readonly SqliteCommerceStore _store = store ?? throw new ArgumentNullException(nameof(store));
 
@@ -48,6 +48,12 @@ public sealed class SqliteCommerceAdapter(
             session.BusinessDate,
             session.OpeningBalance);
     }
+
+    public Task<CashClosing> CloseAsync(
+        EntityId<CashSession> cashSessionId,
+        decimal actualCash,
+        CancellationToken cancellationToken = default) =>
+        _store.CloseCashSessionAsync(cashSessionId, actualCash, cancellationToken);
 
     public Task CommitSaleAsync(
         Sale sale,
