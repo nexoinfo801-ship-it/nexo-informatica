@@ -63,4 +63,25 @@ public sealed class ClienteRuntimeTests : IAsyncLifetime
         Assert.Equal(75m, runtime.Checkout.OpeningBalance);
     }
 
+    [Fact]
+    public async Task Runtime_wires_real_cash_closing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var runtime = await ClienteRuntime.CreateAsync(
+            _databasePath,
+            cancellationToken);
+
+        runtime.Checkout.OpeningBalance = 75m;
+        Assert.True(await runtime.Checkout.OpenCashSessionAsync(cancellationToken));
+
+        runtime.Checkout.ActualCash = 74m;
+        var closed = await runtime.Checkout.CloseCashSessionAsync(cancellationToken);
+
+        Assert.True(closed);
+        Assert.False(runtime.Checkout.HasOpenCashSession);
+        Assert.NotNull(runtime.Checkout.LastCashClosing);
+        Assert.Equal(74m, runtime.Checkout.LastCashClosing!.ActualCash);
+        Assert.Equal(-1m, runtime.Checkout.LastCashClosing.Difference);
+    }
+
 }
