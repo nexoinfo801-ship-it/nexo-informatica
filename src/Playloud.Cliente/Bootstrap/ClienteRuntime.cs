@@ -36,6 +36,7 @@ public sealed class ClienteRuntime : IAsyncDisposable
             var updateProduct = new UpdateProduct(adapter);
             var adjustProductStock = new AdjustProductStock(adapter);
             IOpenCashSession openCashSession = new OpenCashSession(adapter);
+            ICloseCashSession closeCashSession = new CloseCashSession(adapter);
             var checkout = new SaleCheckoutViewModel(
                 finalizarVenda,
                 searchProducts,
@@ -44,7 +45,8 @@ public sealed class ClienteRuntime : IAsyncDisposable
                 updateProduct,
                 adjustProductStock,
                 openCashSession,
-                TimeProvider.System);
+                TimeProvider.System,
+                closeCashSession);
             return new ClienteRuntime(store, checkout);
         }
         catch
